@@ -1,0 +1,16 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 2rem;
+  text-align: center;
+}
+
+button { 
+  transition: 0.3s ease-in-out;
+}
+
+button:hover {
+  background-color: rgb(83, 80, 80);
+  transition: 0.3s ease-out;
+  transform: translateY(-5px);
+}

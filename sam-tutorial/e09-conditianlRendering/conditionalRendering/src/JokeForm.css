@@ -1,0 +1,12 @@
+.form {
+    padding: 200;
+    color: rgb(37, 196, 37);
+}
+
+h1 {
+    color: red;
+    background-color: blue;
+    text-align: center;
+    padding: 20px;
+    margin: 10px;
+}
