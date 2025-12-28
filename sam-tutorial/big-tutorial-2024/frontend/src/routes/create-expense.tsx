@@ -19,13 +19,8 @@ function CreateExpense() {
     },
     onSubmit: async ({ value }) => {
       // Do something with form data
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate network delay
-      const payload = {
-      ...value,
-      amount: value.amount === '' ? 0 : Number(value.amount),
-    }
 
-      const res = await api.expenses.$post({ json: payload })
+      const res = await api.expenses.$post({ json: value })
       if (!res.ok) {
         throw new Error('Network response was not ok')
       }

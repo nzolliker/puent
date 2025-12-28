@@ -3,44 +3,43 @@ import { zValidator } from '@hono/zod-validator'
 import { z } from 'zod'
 
 import { db } from '../db'
-import { expenses } from '../db/schema/expenses'
-
-type Expense = {
-    id: number,
-    title: string,
-    amount: number,
-}
+import { expenses as expensesTable } from '../db/schema/expenses'
 
 const expenseSchema = z.object({
     id: z.number().positive(),
     title: z.string(),
-    amount: z.number().positive(),
+    amount: z.string(),
 });
+
+type Expense = z.infer<typeof expenseSchema>;
 
 const createPostSchema = expenseSchema.omit({ id: true });
 
-type ExpensePost = z.infer<typeof createPostSchema>;
-
 const fakeExpenses: Expense[] = [
-    { id: 1, title: 'Coffee', amount: 3.5 },
-    { id: 2, title: 'Books', amount: 12.99 },
-    { id: 3, title: 'Groceries', amount: 45.0 },
+    { id: 1, title: 'Coffee', amount: "3.5" },
+    { id: 2, title: 'Books', amount: "12.99" },
+    { id: 3, title: 'Groceries', amount: "45.0" },
 ]
 
 export const expensesRoutes = new Hono()
 
-.get('/', (c) => {
-  return c.json({ expenses: fakeExpenses })
+.get('/', async (c) => {
+
+  const expenses = await db.select().from(expensesTable);
+
+  return c.json({ expenses: expenses })
 })
 
 .get('/total-spent',(c) => {
-    const total = fakeExpenses.reduce((acc, expense) => acc + expense.amount, 0);
+    const total = fakeExpenses.reduce((acc, expense) => acc + +expense.amount, 0);
     return c.json({ total });
 })
 
 .post('/', zValidator('json', createPostSchema), async (c) => {
     const expense = await c.req.valid('json')
-    fakeExpenses.push({...expense, id: fakeExpenses.length + 1})
+
+    await db.insert(expensesTable).values({ ...expense });
+
     c.status(201)
     return c.json(expense)
 })
