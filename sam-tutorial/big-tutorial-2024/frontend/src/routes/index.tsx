@@ -30,7 +30,7 @@ function Index() {
   if (error) return 'An error has occurred: ' + error.message
 
   return (
-    <>
+    <div className='mr-2 ml-2'>
         <Card className="w-full max-w-sm m-auto mt-3">
           <CardHeader>
             <CardTitle>Total Spent</CardTitle>
@@ -38,7 +38,6 @@ function Index() {
           </CardHeader>
             <CardContent>{isPending ? "Loading..." : data.total}</CardContent>
         </Card>
-    </>
+    </div>
   )
 }
-

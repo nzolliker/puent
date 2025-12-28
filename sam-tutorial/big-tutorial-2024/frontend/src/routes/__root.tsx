@@ -3,7 +3,7 @@ import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
 
 function NavBar() {
   return (
-    <div className="p-2 flex gap-2 fixed bottom-0 left-1 right-0 border-t">
+    <div className="p-2 flex justify-between left-1 right-0 border-t m-auto">
       <Link to="/" className="[&.active]:font-bold">
         Home
       </Link>{' '}
@@ -27,5 +27,6 @@ const RootLayout = () => (
     {/* <TanStackRouterDevtools /> */}
   </>
 )
+
 
 export const Route = createRootRoute({ component: RootLayout })

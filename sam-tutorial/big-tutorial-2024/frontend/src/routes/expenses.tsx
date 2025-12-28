@@ -18,7 +18,6 @@ export const Route = createFileRoute('/expenses')({
 })
 
 async function getAllExpenses() {
-  await new Promise((resolve) => setTimeout(resolve, 2000)); // Simulate network delay
   const response = await api.expenses.$get()
   if (!response.ok) {
     throw new Error('Network response was not ok')
