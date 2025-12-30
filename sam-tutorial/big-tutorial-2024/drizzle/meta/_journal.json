@@ -15,6 +15,13 @@
       "when": 1766941125655,
       "tag": "0001_remarkable_skullbuster",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "5",
+      "when": 1767112291733,
+      "tag": "0002_famous_fallen_one",
+      "breakpoints": true
     }
   ]
 }

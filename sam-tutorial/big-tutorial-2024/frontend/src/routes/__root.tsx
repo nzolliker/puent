@@ -10,6 +10,9 @@ function NavBar() {
       <Link to="/about" className="[&.active]:font-bold">
         About
       </Link>
+      <Link to="/waterPlants" className="[&.active]:font-bold">
+        Giessen
+      </Link>
       <Link to="/expenses" className="[&.active]:font-bold">
         Expenses
       </Link>

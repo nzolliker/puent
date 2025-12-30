@@ -52,11 +52,11 @@ function Expenses() {
             <TableCell><Skeleton className="h-4 w-full" /></TableCell>
           </TableRow> ))
         :
-          data?.expenses.map((expenses) => (
-          <TableRow key={expenses.id}>
-            <TableCell className="font-medium">{expenses.id}</TableCell>
-            <TableCell>{expenses.title}</TableCell>
-            <TableCell>{expenses.amount}</TableCell>
+          data?.expenses?.map((expense) => (
+          <TableRow key={expense.id}>
+            <TableCell className="font-medium">{expense.id}</TableCell>
+            <TableCell>{expense.title}</TableCell>
+            <TableCell>{expense.amount}</TableCell>
           </TableRow>
         ))}
       </TableBody>

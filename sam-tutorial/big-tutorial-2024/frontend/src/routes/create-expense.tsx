@@ -2,13 +2,28 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { useForm } from '@tanstack/react-form'
+import { revalidateLogic, useForm } from '@tanstack/react-form'
 import type { AnyFieldApi } from '@tanstack/react-form'
 import { api } from '@/lib/api'
+import { createExpenseSchema } from '@server/sharedTypes'
 
 export const Route = createFileRoute('/create-expense')({
   component: CreateExpense,
 })
+
+function FieldInfo({ field }: { field: AnyFieldApi }) {
+  return (
+    <p className="error">
+      {
+        typeof field.state.meta.errors[0] === 'object' && (
+          <div className={`error ${field.state.meta.errors[0].severity}`}>
+            {field.state.meta.errors[0].message}
+          </div>
+        )
+      }
+    </p>
+  )
+}
 
 function CreateExpense() {
   const navigate = useNavigate()
@@ -17,6 +32,9 @@ function CreateExpense() {
       title: '',
       amount: '',
     },
+    validators: {
+        onChange: createExpenseSchema,
+      },
     onSubmit: async ({ value }) => {
       // Do something with form data
 
@@ -27,17 +45,6 @@ function CreateExpense() {
       navigate({to: "/expenses"})
     },
   })
-
-function FieldInfo({ field }: { field: AnyFieldApi }) {
-  return (
-    <>
-      {field.state.meta.isTouched && !field.state.meta.isValid ? (
-        <em>{field.state.meta.errors.join(', ')}</em>
-      ) : null}
-      {field.state.meta.isValidating ? 'Validating...' : null}
-    </>
-  )
-}
 
   return (
   <div className="p-2">
@@ -61,8 +68,9 @@ function FieldInfo({ field }: { field: AnyFieldApi }) {
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
-                  <FieldInfo field={field} />
-               </>)}} />
+               </>
+              )
+              }} />
           <form.Field
             name="amount"
             children={(field) => {
@@ -79,7 +87,9 @@ function FieldInfo({ field }: { field: AnyFieldApi }) {
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
                   <FieldInfo field={field} />
-              </>)}} />
+              </>
+             )
+            }} />
             <form.Subscribe
               selector={(state) => [state.canSubmit, state.isSubmitting]}
               children={([canSubmit, isSubmitting]) => (
