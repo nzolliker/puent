@@ -2,10 +2,12 @@ import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
-import { revalidateLogic, useForm } from '@tanstack/react-form'
+import { useForm } from '@tanstack/react-form'
 import type { AnyFieldApi } from '@tanstack/react-form'
 import { api } from '@/lib/api'
-import { createExpenseSchema } from '@server/sharedTypes'
+import { createExpenseFormSchema } from '@server/sharedTypes'
+import { Calendar } from '@/components/ui/calendar'
+import { date } from 'drizzle-orm/mysql-core'
 
 export const Route = createFileRoute('/create-expense')({
   component: CreateExpense,
@@ -31,13 +33,14 @@ function CreateExpense() {
     defaultValues: {
       title: '',
       amount: '',
+      date: new Date(),
     },
     validators: {
-        onChange: createExpenseSchema,
+        onChange: createExpenseFormSchema,
       },
     onSubmit: async ({ value }) => {
       // Do something with form data
-
+      console.log(value)
       const res = await api.expenses.$post({ json: value })
       if (!res.ok) {
         throw new Error('Network response was not ok')
@@ -48,7 +51,7 @@ function CreateExpense() {
 
   return (
   <div className="p-2">
-    <form className="max-w-xl m-auto"
+    <form className="max-w-xl m-auto flex flex-col"
         onSubmit={(e) => {
           e.preventDefault()
           e.stopPropagation()
@@ -59,11 +62,11 @@ function CreateExpense() {
             children={(field) => {
               return (
                <>
-                <Label htmlFor={field.name}>Title</Label>
+                <Label htmlFor={field.name}>Titel</Label>
                 <Input 
                     id={field.name}
                     name={field.name}
-                    placeholder="title"
+                    placeholder="Was?"
                     value={field.state.value}
                     onBlur={field.handleBlur}
                     onChange={(e) => field.handleChange(e.target.value)}
@@ -76,7 +79,7 @@ function CreateExpense() {
             children={(field) => {
               return (
                <>
-                <Label htmlFor={field.name} className='mt-3'>Amount</Label>
+                <Label htmlFor={field.name} className='mt-3'>Betrag</Label>
                 <Input 
                     id={field.name}
                     name={field.name}
@@ -86,10 +89,25 @@ function CreateExpense() {
                     type="number"
                     onChange={(e) => field.handleChange(e.target.value)}
                   />
-                  <FieldInfo field={field} />
+                 {/* <FieldInfo field={field} /> */}
               </>
              )
             }} />
+          <form.Field
+            name="date"
+            children={(field) => {
+              return (
+               <div className='self-center pt-4'>
+                <Label className='mb-2' htmlFor={field.name}>Datum</Label>
+                 <Calendar
+                    mode="single"
+                    selected={field.state.value}
+                    onSelect={(date) => field.handleChange((date ?? new Date()))}
+                    className="rounded-lg border"
+                  /> 
+               </div>
+              )
+              }} />
             <form.Subscribe
               selector={(state) => [state.canSubmit, state.isSubmitting]}
               children={([canSubmit, isSubmitting]) => (

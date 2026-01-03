@@ -33,10 +33,10 @@ function Index() {
     <div className='mr-2 ml-2'>
         <Card className="w-full max-w-sm m-auto mt-3">
           <CardHeader>
-            <CardTitle>Total Spent</CardTitle>
-            <CardDescription>The total amount you have spent</CardDescription>
+            <CardTitle>Gesamte Ausgaben</CardTitle>
+            <CardDescription>Alle Ausgaben addiert</CardDescription>
           </CardHeader>
-            <CardContent>{isPending ? "Loading..." : data.total}</CardContent>
+            <CardContent>{isPending ? "Loading..." : (data.total + ' CHF')}</CardContent>
         </Card>
     </div>
   )

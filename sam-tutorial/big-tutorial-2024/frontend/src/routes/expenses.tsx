@@ -1,6 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useQuery } from '@tanstack/react-query'
+import { Button } from '@/components/ui/button'
+import { Trash2 } from 'lucide-react'
 
 import {
   Table,
@@ -26,6 +28,10 @@ async function getAllExpenses() {
   return data
 }
 
+async function handleDelete(id: string) {
+  await api.expenses[':id{[0-9]+}'].$delete({ param: { id }})
+}
+
 function Expenses() {
   const { isPending, error, data} = useQuery({ queryKey: ['get-all-expenses'], queryFn: getAllExpenses })
 
@@ -38,9 +44,10 @@ function Expenses() {
       <TableCaption>A list of your recent expensess.</TableCaption>
       <TableHeader>
         <TableRow>
-          <TableHead className="w-[100px]">ID</TableHead>
+          <TableHead className="w-[50px]">ID</TableHead>
           <TableHead>Title</TableHead>
           <TableHead>Amount</TableHead>
+          <TableHead className="w-[70px]">Actions</TableHead>
         </TableRow>
       </TableHeader>
       <TableBody>
@@ -50,6 +57,7 @@ function Expenses() {
             <TableCell><Skeleton className="h-4 w-4" /></TableCell>
             <TableCell><Skeleton className="h-4 w-full" /></TableCell>
             <TableCell><Skeleton className="h-4 w-full" /></TableCell>
+            <TableCell className="flex justify-center"><Button variant="outline"><Trash2 className="h-4 w-4" /></Button></TableCell>
           </TableRow> ))
         :
           data?.expenses?.map((expense) => (
@@ -57,6 +65,11 @@ function Expenses() {
             <TableCell className="font-medium">{expense.id}</TableCell>
             <TableCell>{expense.title}</TableCell>
             <TableCell>{expense.amount}</TableCell>
+            <TableCell className="flex justify-center">
+              <Button variant="outline" type="button" onClick={() => handleDelete(expense.id)}>
+                <Trash2 className="h-4 w-4" />
+              </Button>
+            </TableCell>
           </TableRow>
         ))}
       </TableBody>
