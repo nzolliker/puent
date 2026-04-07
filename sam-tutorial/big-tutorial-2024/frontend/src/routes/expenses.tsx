@@ -1,6 +1,6 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { api } from '@/lib/api'
-import { useQuery } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
 import { Trash2 } from 'lucide-react'
 
@@ -33,7 +33,17 @@ async function handleDelete(id: string) {
 }
 
 function Expenses() {
+    const queryClient = useQueryClient()
     const { isPending, error, data } = useQuery({ queryKey: ['get-all-expenses'], queryFn: getAllExpenses })
+    const deleteExpenseMutation = useMutation({
+        mutationFn: handleDelete,
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['get-all-expenses'] })
+        },
+    })
+
+    const formatDate = (value: string) =>
+        new Date(value).toLocaleDateString("de-CH");
 
     if (error) return 'An error has occurred: ' + error.message
 
@@ -44,10 +54,10 @@ function Expenses() {
                     <TableCaption>A list of your recent expensess.</TableCaption>
                     <TableHeader>
                         <TableRow>
-                            <TableHead className="w-[50px]">ID</TableHead>
-                            <TableHead>Title</TableHead>
+                            <TableHead className="max-w-[120px] truncate">Title</TableHead>
                             <TableHead>Amount</TableHead>
-                            <TableHead className="w-[70px]">Actions</TableHead>
+                            <TableHead>Date</TableHead>
+                            <TableHead>Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -62,11 +72,16 @@ function Expenses() {
                             :
                             data?.expenses?.map((expense) => (
                                 <TableRow key={expense.id}>
-                                    <TableCell className="font-medium">{expense.id}</TableCell>
-                                    <TableCell>{expense.title}</TableCell>
+                                    <TableCell className="max-w-[150px] truncate font-medium">{expense.title}</TableCell>
                                     <TableCell>{expense.amount}</TableCell>
+                                    <TableCell className="max-w-[90px] truncate">{formatDate(expense.date)}</TableCell>
                                     <TableCell className="flex justify-center">
-                                        <Button variant="outline" type="button" onClick={() => handleDelete(expense.id)}>
+                                        <Button
+                                            variant="outline"
+                                            type="button"
+                                            disabled={deleteExpenseMutation.isPending}
+                                            onClick={() => deleteExpenseMutation.mutate(expense.id)}
+                                        >
                                             <Trash2 className="h-4 w-4" />
                                         </Button>
                                     </TableCell>

@@ -1,0 +1,1 @@
+ALTER TABLE `waterPlants` ADD `created_at` timestamp DEFAULT (now());

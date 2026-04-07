@@ -17,9 +17,7 @@ async function getAllDates() {
         throw new Error('Network response was not ok')
     }
     const data = await response.json()
-    console.log(data)
     const dates = data.waterPlants.map(({ date }) => new Date(date))
-    console.log(dates)
     return dates
 }
 
@@ -27,15 +25,8 @@ function Giessen() {
     const [date, setDate] = React.useState<Date | undefined>(
         new Date()
     )
-    const bookedDates = [new Date(2025, 11, 15), new Date(2025, 11, 18), new Date(2025, 11, 20)]
-    /* Array.from(
-    { length: 12 },
-    (_, i) => new Date(2025, 5, 15 + i)
-  ) */
 
-    console.log("bookedDates", bookedDates)
-
-    const { isPending, error, data } = useQuery({ queryKey: ['get-all-expenses'], queryFn: getAllDates })
+    const { isPending, error, data } = useQuery({ queryKey: ['get-all-water-dates'], queryFn: getAllDates })
 
     if (error) return 'An error has occurred: ' + error.message
 
@@ -47,7 +38,7 @@ function Giessen() {
                 defaultMonth={date}
                 selected={date}
                 onSelect={setDate}
-                disabled={bookedDates}
+                disabled={data}
                 modifiers={{
                     booked: data,
                 }}
