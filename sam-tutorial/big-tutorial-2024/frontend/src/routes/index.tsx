@@ -24,20 +24,42 @@ async function getTotalSpent() {
     return data
 }
 
-function Index() {
-    const { isPending, error, data } = useQuery({ queryKey: ['get-total-spent'], queryFn: getTotalSpent })
+async function getNextFreeDate() {
+    const response = await api["water-plants"]["next-free-date"].$get()
+    if (!response.ok) {
+        throw new Error('Network response was not ok')
+    }
+    const data = await response.json()
+    return data
+}
 
-    if (error) return 'An error has occurred: ' + error.message
+function Index() {
+    const { isPending: totalIsPending, error: totalSpentError, data: totalSpent } = useQuery({ queryKey: ['get-total-spent'], queryFn: getTotalSpent })
+    const { isPending: nextDateIsPending, error: nextDateSpentError, data: nextDate } = useQuery({ queryKey: ['get-next-free-date'], queryFn: getNextFreeDate })
+
+    if (totalSpentError) return 'An error has occurred: ' + totalSpentError.message
 
     return (
-        <div className='mr-2 ml-2'>
-            <Card className="w-full max-w-sm m-auto mt-3">
-                <CardHeader>
-                    <CardTitle>Gesamte Ausgaben</CardTitle>
-                    <CardDescription>Alle Ausgaben addiert</CardDescription>
-                </CardHeader>
-                <CardContent>{isPending ? "Loading..." : (data.total + ' CHF')}</CardContent>
-            </Card>
-        </div>
+        <>
+            <div className='mr-2 ml-2'>
+                <Card className="w-full max-w-sm m-auto mt-3">
+                    <CardHeader>
+                        <CardTitle>Ausgaben</CardTitle>
+                        <CardDescription>Alle Ausgaben addiert:</CardDescription>
+                    </CardHeader>
+                    <CardContent>{totalIsPending ? "Loading..." : (totalSpent.total + ' CHF')}</CardContent>
+                </Card>
+            </div>
+            <div className='mr-2 ml-2'>
+                <Card className="w-full max-w-sm m-auto mt-3">
+                    <CardHeader>
+                        <CardTitle>Giessen</CardTitle>
+                        <CardDescription>Nächster offener Tag:</CardDescription>
+                    </CardHeader>
+                    <CardContent>{nextDateIsPending ? "Loading..." : ('in ' + nextDate.numberOfDays + ' Tagen')}</CardContent>
+                    <CardContent>{nextDateIsPending ? "Loading..." : ('Datum: ' + nextDate.nextFreeDate)}</CardContent>
+                </Card>
+            </div>
+        </>
     )
 }

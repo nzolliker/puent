@@ -13,7 +13,7 @@ export const waterPlants = mysqlTable("waterPlants", {
   id: serial().primaryKey(),
   name: text("name"),
   createdAt: timestamp("created_at").defaultNow(),
-  date: date("date"),
+  date: date("date").notNull(),
 });
 
 export const insertWaterDateSchema = createInsertSchema(waterPlants, {
@@ -22,6 +22,6 @@ export const insertWaterDateSchema = createInsertSchema(waterPlants, {
 });
 
 export const selectWaterDateSchema = createSelectSchema(waterPlants, {
-  name: z.string().min(3, { message: "Titel erforderlich" }),
+  name: z.string().min(1),
   date: z.coerce.date(),
 });
