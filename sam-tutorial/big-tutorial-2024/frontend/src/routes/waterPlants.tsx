@@ -31,8 +31,14 @@ type WaterFormValues = {
 type WaterDialogProps = {
     open: boolean
     onOpenChange: (open: boolean) => void
-    form: any
     pickedDate: Date
+    form: ReturnType<typeof useForm<WaterFormValues>>
+}
+
+type WaterBooking = {
+    date: Date
+    dayKey: string
+    name: string
 }
 
 function toLocalDayKey(value: Date) {
@@ -50,6 +56,10 @@ function formatPickedDate(value: Date) {
         month: '2-digit',
         year: 'numeric',
     }).format(value)
+}
+
+function getFirstName(name: string) {
+    return name.trim().split(/\s+/)[0] ?? ''
 }
 
 async function handleEnroll(value: { name: string; date: Date }) {
@@ -72,23 +82,31 @@ async function getAllDates() {
     }
 
     const data = await response.json()
-    return data.waterPlants.map(({ date }) => new Date(date))
+    return data.waterPlants.map(({ date, name }) => {
+        const parsedDate = new Date(date)
+
+        return {
+            date: parsedDate,
+            dayKey: toLocalDayKey(parsedDate),
+            name,
+        } satisfies WaterBooking
+    })
 }
 
-function WaterDialog({ open, onOpenChange, form, pickedDate }: WaterDialogProps) {
+function WaterDialog({ open, onOpenChange, pickedDate, form }: WaterDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="sm:max-w-sm">
-                <DialogHeader>
+            <DialogContent className="top-[10dvh] bottom-auto max-h-[calc(100dvh-12dvh)] translate-y-0 gap-0 overflow-y-auto p-0 sm:top-[50%] sm:max-w-sm sm:translate-y-[-50%]">
+                <DialogHeader className="px-4 pt-5 sm:px-6 sm:pt-6">
                     <DialogTitle>Giessen eintragen</DialogTitle>
                     <DialogDescription>
                         Möchtest du am {formatPickedDate(pickedDate)} giessen?
                     </DialogDescription>
                 </DialogHeader>
-                <FieldGroup>
+                <FieldGroup className="px-4 pt-4 sm:px-6">
                     <form.Field
                         name="name"
-                        children={(field: any) => (
+                        children={(field) => (
                             <>
                                 <Label htmlFor={field.name}>Name</Label>
                                 <Input
@@ -103,16 +121,16 @@ function WaterDialog({ open, onOpenChange, form, pickedDate }: WaterDialogProps)
                         )}
                     />
                 </FieldGroup>
-                <DialogFooter>
+                <DialogFooter className="sticky bottom-0 border-t bg-background px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
                     <DialogClose asChild>
-                        <Button variant="outline">Cancel</Button>
+                        <Button variant="outline">Abbrechen</Button>
                     </DialogClose>
                     <form.Subscribe
-                        selector={(state: any) => [state.canSubmit, state.isSubmitting] as const}
-                        children={([canSubmit, isSubmitting]: readonly [boolean, boolean]) => (
+                        selector={(state) => [state.values.name, state.isSubmitting] as const}
+                        children={([name, isSubmitting]: readonly [string, boolean]) => (
                             <Button
                                 type="button"
-                                disabled={!canSubmit}
+                                disabled={name.trim().length === 0 || isSubmitting}
                                 onClick={async () => {
                                     await form.handleSubmit()
                                 }}
@@ -165,6 +183,9 @@ function Giessen() {
         },
     })
 
+    const bookedDates = data?.map((booking) => booking.date) ?? []
+    const bookedNamesByDay = new Map(data?.map((booking) => [booking.dayKey, booking.name]) ?? [])
+
     if (error) return 'An error has occurred: ' + error.message
 
     return (
@@ -179,23 +200,37 @@ function Giessen() {
                             defaultMonth={field.state.value ?? new Date()}
                             selected={field.state.value ?? undefined}
                             onSelect={(date) => field.handleChange(date ?? null)}
-                            disabled={data}
+                            disabled={bookedDates}
                             modifiers={{
-                                booked: data,
+                                booked: bookedDates,
                             }}
                             modifiersClassNames={{
-                                booked: '[&>button]:line-through rounded-lg border opacity-80 [&>button]:bg-green-300',
+                                booked: '[&>button]:line-through rounded-lg border opacity-100 [&>button]:bg-green-400',
                             }}
                             className="rounded-lg border shadow-sm mt-3 justify-center [--cell-size:--spacing(11)] md:[--cell-size:--spacing(12)]"
                             components={{
-                                DayButton: ({ children, modifiers, day, ...props }) => {
-                                    const isWeekend =
-                                        day.date.getDay() === 0 || day.date.getDay() === 6
+                                DayButton: ({ children, modifiers, day, className, ...props }) => {
+                                    const bookedName = bookedNamesByDay.get(toLocalDayKey(day.date))
+                                    const firstName = bookedName ? getFirstName(bookedName) : null
+
                                     return (
-                                        <CalendarDayButton day={day} modifiers={modifiers} {...props}>
-                                            {children}
-                                            {modifiers.booked && (
-                                                <span>Name</span>
+                                        <CalendarDayButton
+                                            day={day}
+                                            modifiers={modifiers}
+                                            className={
+                                                modifiers.booked
+                                                    ? `relative px-1 py-1 text-center ${className ?? ''}`
+                                                    : className
+                                            }
+                                            {...props}
+                                        >
+                                            <span className={firstName ? 'translate-y-[-0.2rem]' : undefined}>
+                                                {children}
+                                            </span>
+                                            {firstName && (
+                                                <span className="pointer-events-none absolute right-1 bottom-1 left-1 truncate text-[0.5rem] leading-none text-emerald-900/80">
+                                                    {firstName}
+                                                </span>
                                             )}
                                         </CalendarDayButton>
                                     )
@@ -205,7 +240,7 @@ function Giessen() {
                     )}
                 />
                 <form.Subscribe
-                    selector={(state: any) => state.values.date as Date | null}
+                    selector={(state) => state.values.date}
                     children={(pickedDate: Date | null) => (
                         <>
                             <p className="mt-3 text-sm text-muted-foreground">
@@ -226,14 +261,14 @@ function Giessen() {
                 />
             </div>
             <form.Subscribe
-                selector={(state: any) => state.values.date as Date | null}
+                selector={(state) => state.values.date}
                 children={(pickedDate: Date | null) =>
                     pickedDate ? (
                         <WaterDialog
                             open={dialogOpen}
                             onOpenChange={setDialogOpen}
-                            form={form}
                             pickedDate={pickedDate}
+                            form={form}
                         />
                     ) : null
                 }
