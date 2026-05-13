@@ -1,6 +1,6 @@
+import { z } from "zod";
 import { insertExpenseSchema, selectExpenseSchema } from "./db/schema/expenses";
 import {
-  selectWaterDateSchema,
   insertWaterDateSchema,
 } from "./db/schema/waterPlants";
 
@@ -21,7 +21,10 @@ export const createWaterSchema = insertWaterDateSchema.omit({
   createdAt: true,
 });
 
-export const createWaterFormSchema = selectWaterDateSchema.omit({
-  id: true,
-  createdAt: true,
+export const createWaterFormSchema = z.object({
+  name: z.string().min(1),
+  date: z.date().nullable(),
+}).refine((value) => value.date !== null, {
+  path: ["date"],
+  message: "Bitte ein Datum auswählen",
 });

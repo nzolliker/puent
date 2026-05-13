@@ -57,7 +57,7 @@ function Expenses() {
                             <TableHead className="max-w-[120px] truncate">Title</TableHead>
                             <TableHead>Amount</TableHead>
                             <TableHead>Date</TableHead>
-                            <TableHead>Actions</TableHead>
+                            <TableHead className="flex justify-center">Actions</TableHead>
                         </TableRow>
                     </TableHeader>
                     <TableBody>
