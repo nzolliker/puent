@@ -1,5 +1,45 @@
 # Deployment Runbook
 
+## deployment quick description:
+
+1. On your MacBook, commit and push the new code:
+
+`
+git add .
+git commit -m "Add new feature"
+git push
+`
+
+2. SSH into the Pi and go to the production checkout:
+
+3. Pull the new version:
+
+`
+git status
+git pull
+`
+
+4. Rebuild the app image from the updated code:
+
+`docker compose --env-file .env.production build app`
+
+5. Recreate/start the app with the new image:
+
+`docker compose --env-file .env.production up -d app`
+
+6. If the feature includes DB schema changes, run migrations:
+
+`docker exec -it puent-app bunx drizzle-kit migrate`
+
+7. Verify the deployment:
+
+`
+docker compose --env-file .env.production ps
+docker logs puent-app --tail 100
+curl -i http://localhost:3000/
+curl -i http://localhost:3000/api/expenses
+`
+
 ## Goal
 
 This project runs in two clearly separated environments:
