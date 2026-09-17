@@ -1,4 +1,4 @@
-import { createFileRoute } from '@tanstack/react-router'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { api } from '@/lib/api'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Button } from '@/components/ui/button'
@@ -33,6 +33,7 @@ async function handleDelete(id: string) {
 }
 
 function Expenses() {
+    const navigate = useNavigate()
     const queryClient = useQueryClient()
     const { isPending, error, data } = useQuery({ queryKey: ['get-all-expenses'], queryFn: getAllExpenses })
     const deleteExpenseMutation = useMutation({
@@ -90,5 +91,12 @@ function Expenses() {
                     </TableBody>
                 </Table>
             </pre>
-        </div>)
+            <Button
+                className="mt-3 mx-auto flex"
+                type="button"
+                onClick={() => navigate({ to: "/create-expense" })}
+            >
+                Neuer Eintrag
+            </Button>
+        </div >)
 }
