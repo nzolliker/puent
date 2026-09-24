@@ -28,3 +28,7 @@ export const createWaterFormSchema = z.object({
   path: ["date"],
   message: "Bitte ein Datum auswählen",
 });
+
+export const waterOverviewQuerySchema = z.object({
+  days: z.coerce.number().int().min(0).max(14).default(3),
+});

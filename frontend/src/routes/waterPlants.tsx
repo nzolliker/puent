@@ -16,11 +16,24 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 import { FieldGroup } from '@/components/ui/field'
+import { dayKeyToDate, getFirstName } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { createWaterFormSchema } from '@server/sharedTypes'
 
+const dayKeyPattern = /^\d{4}-\d{2}-\d{2}$/
+
+type WaterSearch = {
+    /** Preselects this day and opens the enroll dialog, e.g. from the dashboard card. */
+    date?: string
+}
+
 export const Route = createFileRoute('/waterPlants')({
     component: Giessen,
+    validateSearch: (search: Record<string, unknown>): WaterSearch => {
+        const date = search.date
+
+        return typeof date === 'string' && dayKeyPattern.test(date) ? { date } : {}
+    },
 })
 
 type WaterFormValues = {
@@ -60,10 +73,6 @@ function formatPickedDate(value: Date) {
     }).format(value)
 }
 
-function getFirstName(name: string) {
-    return name.trim().split(/\s+/)[0] ?? ''
-}
-
 async function handleEnroll(value: { name: string; date: Date }) {
     const res = await api['water-plants'].$post({
         json: {
@@ -95,11 +104,14 @@ async function getAllDates() {
     })
 }
 
-function useWaterForm(onEnroll: (value: { name: string; date: Date }) => Promise<void>) {
+function useWaterForm(
+    onEnroll: (value: { name: string; date: Date }) => Promise<void>,
+    initialDate: Date | null,
+) {
     return useForm({
         defaultValues: {
             name: '',
-            date: null,
+            date: initialDate,
         } as WaterFormValues,
         validators: {
             onChange: createWaterFormSchema,
@@ -167,7 +179,11 @@ function WaterDialog({ open, onOpenChange, pickedDate, form }: WaterDialogProps)
 }
 
 function Giessen() {
-    const [dialogOpen, setDialogOpen] = useState(false)
+    const { date: dateParam } = Route.useSearch()
+    // Arriving with `?date=` (from the dashboard card) preselects that day and opens
+    // the dialog straight away.
+    const [dialogOpen, setDialogOpen] = useState(Boolean(dateParam))
+    const navigate = Route.useNavigate()
     const queryClient = useQueryClient()
     const { error, data } = useQuery({
         queryKey: ['get-all-water-dates'],
@@ -179,14 +195,24 @@ function Giessen() {
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['get-all-water-dates'] })
             await queryClient.invalidateQueries({ queryKey: ['get-next-free-date'] })
+            await queryClient.invalidateQueries({ queryKey: ['get-water-overview'] })
             form.setFieldValue('date', null)
-            setDialogOpen(false)
+            closeDialog()
         },
     })
 
     const form = useWaterForm(async (value) => {
         await insertWaterDateMutation.mutateAsync(value)
-    })
+    }, dateParam ? dayKeyToDate(dateParam) : null)
+
+    // Drop the param once the dialog is gone, so a reload does not reopen it.
+    function closeDialog() {
+        setDialogOpen(false)
+
+        if (dateParam) {
+            void navigate({ search: {}, replace: true })
+        }
+    }
 
     const bookedDates = data?.map((booking) => booking.date) ?? []
     const bookedNamesByDay = new Map(data?.map((booking) => [booking.dayKey, booking.name]) ?? [])
@@ -246,32 +272,42 @@ function Giessen() {
                 />
                 <form.Subscribe
                     selector={(state) => state.values.date}
-                    children={(pickedDate) => (
-                        <>
-                            <p className="mt-3 text-sm text-muted-foreground">
-                                {pickedDate
-                                    ? `Ausgewählt: ${formatPickedDate(pickedDate)}`
-                                    : 'Bitte zuerst ein Datum auswählen'}
-                            </p>
-                            <Button
-                                className="mt-3"
-                                type="button"
-                                disabled={!pickedDate}
-                                onClick={() => setDialogOpen(true)}
-                            >
-                                Einschreiben
-                            </Button>
-                        </>
-                    )}
+                    children={(pickedDate) => {
+                        const pickedIsBooked = Boolean(
+                            pickedDate && bookedNamesByDay.has(toLocalDayKey(pickedDate)),
+                        )
+
+                        return (
+                            <>
+                                <p className="mt-3 text-sm text-muted-foreground">
+                                    {!pickedDate
+                                        ? 'Bitte zuerst ein Datum auswählen'
+                                        : pickedIsBooked
+                                            ? `${formatPickedDate(pickedDate)} ist bereits vergeben`
+                                            : `Ausgewählt: ${formatPickedDate(pickedDate)}`}
+                                </p>
+                                <Button
+                                    className="mt-3"
+                                    type="button"
+                                    disabled={!pickedDate || pickedIsBooked}
+                                    onClick={() => setDialogOpen(true)}
+                                >
+                                    Einschreiben
+                                </Button>
+                            </>
+                        )
+                    }}
                 />
             </div>
             <form.Subscribe
                 selector={(state) => state.values.date}
                 children={(pickedDate) =>
-                    pickedDate ? (
+                    // The guard matters for a hand-typed or stale `?date=` link; the
+                    // calendar itself already disables booked days.
+                    pickedDate && !bookedNamesByDay.has(toLocalDayKey(pickedDate)) ? (
                         <WaterDialog
                             open={dialogOpen}
-                            onOpenChange={setDialogOpen}
+                            onOpenChange={(open) => (open ? setDialogOpen(true) : closeDialog())}
                             pickedDate={pickedDate}
                             form={form}
                         />

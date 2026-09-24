@@ -7,8 +7,8 @@ import {
   insertWaterDateSchema,
 } from "../db/schema/waterPlants";
 
-import { createWaterSchema } from "../sharedTypes";
-import { desc } from "drizzle-orm";
+import { createWaterSchema, waterOverviewQuerySchema } from "../sharedTypes";
+import { and, desc, gte, lte } from "drizzle-orm";
 
 // helper functions
 function toDayKey(value: string | Date) {
@@ -23,10 +23,19 @@ function toDayKey(value: string | Date) {
   return `${year}-${month}-${day}`;
 }
 
-function addOneDay(date: Date) {
+function addDays(date: Date, amount: number) {
   const next = new Date(date);
-  next.setDate(next.getDate() + 1);
+  next.setDate(next.getDate() + amount);
   return next;
+}
+
+function addOneDay(date: Date) {
+  return addDays(date, 1);
+}
+
+function startOfToday() {
+  const now = new Date();
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
 }
 
 /*
@@ -79,14 +88,7 @@ export const waterPlantsRoutes = new Hono()
     );
     console.log(bookedDates);
 
-    const today = new Date();
-    const candidate = new Date(
-      today.getFullYear(),
-      today.getMonth(),
-      today.getDate(),
-    );
-
-    let nextFreeDate = candidate;
+    let nextFreeDate = startOfToday();
     console.log(nextFreeDate);
     let counterDays = 0;
 
@@ -98,5 +100,63 @@ export const waterPlantsRoutes = new Hono()
     return c.json({
       nextFreeDate: toDayKey(nextFreeDate),
       numberOfDays: counterDays,
+    });
+  })
+
+  .get("/overview", zValidator("query", waterOverviewQuerySchema), async (c) => {
+    const { days } = c.req.valid("query");
+
+    const today = startOfToday();
+    const todayKey = toDayKey(today);
+
+    const windowKeys = Array.from({ length: days * 2 + 1 }, (_, index) =>
+      toDayKey(addDays(today, index - days)),
+    );
+
+    // The driver serializes these Dates in local time, so the bounds have to be
+    // local midnight -- which is what addDays/startOfToday already produce.
+    const rows = await db
+      .select({ date: waterPlantsTable.date, name: waterPlantsTable.name })
+      .from(waterPlantsTable)
+      .where(
+        and(
+          gte(waterPlantsTable.date, addDays(today, -days)),
+          lte(waterPlantsTable.date, addDays(today, days)),
+        ),
+      );
+
+    // A day counts as taken as soon as a row exists for it, even if the name is
+    // empty -- same rule the calendar and /next-free-date already use.
+    const bookedDays = new Set<string>();
+    const namesByDay = new Map<string, string[]>();
+
+    for (const row of rows) {
+      const dayKey = toDayKey(row.date);
+      bookedDays.add(dayKey);
+
+      const name = row.name?.trim();
+      if (!name) {
+        continue;
+      }
+
+      const names = namesByDay.get(dayKey);
+      if (names) {
+        names.push(name);
+      } else {
+        namesByDay.set(dayKey, [name]);
+      }
+    }
+
+    const overviewDays = windowKeys.map((dayKey) => ({
+      date: dayKey,
+      names: namesByDay.get(dayKey) ?? [],
+      isOpen: !bookedDays.has(dayKey),
+      isToday: dayKey === todayKey,
+    }));
+
+    return c.json({
+      today: todayKey,
+      openCount: overviewDays.filter((day) => day.isOpen).length,
+      days: overviewDays,
     });
   });
