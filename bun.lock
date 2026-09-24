@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "big-tutorial-2024",
+      "name": "puent",
       "dependencies": {
         "@hono/zod-validator": "^0.7.6",
         "@libsql/client": "^0.15.15",

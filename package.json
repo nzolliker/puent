@@ -1,10 +1,13 @@
 {
-  "name": "big-tutorial-2024",
+  "name": "puent",
   "module": "server/index.ts",
   "type": "module",
   "scripts": {
     "start": "bun server/index.ts",
-    "dev": "bun --watch server/index.ts"
+    "dev": "bun --watch server/index.ts",
+    "typecheck": "tsc --noEmit",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "private": true,
   "devDependencies": {

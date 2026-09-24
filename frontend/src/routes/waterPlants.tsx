@@ -28,11 +28,13 @@ type WaterFormValues = {
     date: Date | null
 }
 
+type WaterFormApi = ReturnType<typeof useWaterForm>
+
 type WaterDialogProps = {
     open: boolean
     onOpenChange: (open: boolean) => void
     pickedDate: Date
-    form: ReturnType<typeof useForm<WaterFormValues>>
+    form: WaterFormApi
 }
 
 type WaterBooking = {
@@ -88,8 +90,27 @@ async function getAllDates() {
         return {
             date: parsedDate,
             dayKey: toLocalDayKey(parsedDate),
-            name,
+            name: name ?? '',
         } satisfies WaterBooking
+    })
+}
+
+function useWaterForm(onEnroll: (value: { name: string; date: Date }) => Promise<void>) {
+    return useForm({
+        defaultValues: {
+            name: '',
+            date: null,
+        } as WaterFormValues,
+        validators: {
+            onChange: createWaterFormSchema,
+        },
+        onSubmit: async ({ value }) => {
+            if (!value.date) {
+                return
+            }
+
+            await onEnroll({ name: value.name, date: value.date })
+        },
     })
 }
 
@@ -127,7 +148,7 @@ function WaterDialog({ open, onOpenChange, pickedDate, form }: WaterDialogProps)
                     </DialogClose>
                     <form.Subscribe
                         selector={(state) => [state.values.name, state.isSubmitting] as const}
-                        children={([name, isSubmitting]: readonly [string, boolean]) => (
+                        children={([name, isSubmitting]) => (
                             <Button
                                 type="button"
                                 disabled={name.trim().length === 0 || isSubmitting}
@@ -163,24 +184,8 @@ function Giessen() {
         },
     })
 
-    const form = useForm({
-        defaultValues: {
-            name: '',
-            date: null,
-        } as WaterFormValues,
-        validators: {
-            onChange: createWaterFormSchema,
-        },
-        onSubmit: async ({ value }) => {
-            if (!value.date) {
-                return
-            }
-
-            await insertWaterDateMutation.mutateAsync({
-                name: value.name,
-                date: value.date,
-            })
-        },
+    const form = useWaterForm(async (value) => {
+        await insertWaterDateMutation.mutateAsync(value)
     })
 
     const bookedDates = data?.map((booking) => booking.date) ?? []
@@ -241,7 +246,7 @@ function Giessen() {
                 />
                 <form.Subscribe
                     selector={(state) => state.values.date}
-                    children={(pickedDate: Date | null) => (
+                    children={(pickedDate) => (
                         <>
                             <p className="mt-3 text-sm text-muted-foreground">
                                 {pickedDate
@@ -262,7 +267,7 @@ function Giessen() {
             </div>
             <form.Subscribe
                 selector={(state) => state.values.date}
-                children={(pickedDate: Date | null) =>
+                children={(pickedDate) =>
                     pickedDate ? (
                         <WaterDialog
                             open={dialogOpen}

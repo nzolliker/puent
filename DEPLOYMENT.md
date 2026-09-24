@@ -81,7 +81,7 @@ The host is the Raspberry Pi itself.
 Example host path:
 
 ```text
-/home/nzolliker/repos/puent/sam-tutorial/big-tutorial-2024
+/home/nzolliker/repos/puent
 ```
 
 This is where the production Git checkout lives.
@@ -109,7 +109,7 @@ The volume is Docker-managed persistent storage.
 
 Example:
 
-- Compose volume name: `big-tutorial-2024_mysql_data`
+- Compose volume name: `puent_mysql_data`
 - Mounted inside MySQL container at: `/var/lib/mysql`
 
 This is where the production database files live. Rebuilding the app image does not remove this data.
@@ -135,6 +135,7 @@ Defines the production stack:
 - ports
 - environment variables
 - persistent MySQL volume
+- the compose project name (`name: puent`), which also prefixes the volume name
 
 ### `.env.production`
 
@@ -208,7 +209,7 @@ So Drizzle can connect to the production MySQL container and apply the SQL migra
 All commands below assume you are on the Raspberry Pi in the production checkout:
 
 ```bash
-cd /home/nzolliker/repos/puent/sam-tutorial/big-tutorial-2024
+cd /home/nzolliker/repos/puent
 ```
 
 ## Start The Production Stack
@@ -363,7 +364,7 @@ git push
 
 ```bash
 ssh nzolliker@<pi-ip>
-cd /home/nzolliker/repos/puent/sam-tutorial/big-tutorial-2024
+cd /home/nzolliker/repos/puent
 ```
 
 ### 3. Pull the new version
@@ -430,6 +431,46 @@ This order works well for this project because:
 - the new container is created from the updated code
 - migrations are run against the correct production DB
 - the final verification is explicit
+
+## One-Time Migration: Project Moved To Repo Root
+
+The project used to live in `sam-tutorial/big-tutorial-2024/` inside the repo. It now sits at
+the repo root (`/home/nzolliker/repos/puent`), and the other tutorials moved to `tutorials/`.
+
+Compose derives its project name from the directory, so the stack was renamed from
+`big-tutorial-2024` to `puent`. The name is now pinned explicitly in `docker-compose.yml`
+(`name: puent`) so it no longer depends on the folder name.
+
+The MySQL volume is named after the project, so the existing `big-tutorial-2024_mysql_data`
+volume has to be copied over once. Do this on the Pi, in this order:
+
+```bash
+# 1. stop the OLD stack, from the OLD path, BEFORE pulling
+cd /home/nzolliker/repos/puent/sam-tutorial/big-tutorial-2024
+docker compose down
+
+# 2. pull the new layout
+cd /home/nzolliker/repos/puent
+git pull
+
+# 3. copy the database volume to its new name
+docker volume create puent_mysql_data
+docker run --rm \
+  -v big-tutorial-2024_mysql_data:/from \
+  -v puent_mysql_data:/to \
+  alpine sh -c "cd /from && cp -a . /to"
+
+# 4. start the renamed stack and verify the data is there
+docker compose up -d
+docker compose logs -f app
+```
+
+Keep `big-tutorial-2024_mysql_data` around until you have confirmed the app sees the old data.
+Only then remove it:
+
+```bash
+docker volume rm big-tutorial-2024_mysql_data
+```
 
 ## Persistent Data Warning
 

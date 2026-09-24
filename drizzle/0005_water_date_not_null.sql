@@ -1,0 +1,1 @@
+ALTER TABLE `waterPlants` MODIFY COLUMN `date` date NOT NULL;

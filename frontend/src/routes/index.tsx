@@ -35,9 +35,10 @@ async function getNextFreeDate() {
 
 function Index() {
     const { isPending: totalIsPending, error: totalSpentError, data: totalSpent } = useQuery({ queryKey: ['get-total-spent'], queryFn: getTotalSpent })
-    const { isPending: nextDateIsPending, error: nextDateSpentError, data: nextDate } = useQuery({ queryKey: ['get-next-free-date'], queryFn: getNextFreeDate })
+    const { isPending: nextDateIsPending, error: nextDateError, data: nextDate } = useQuery({ queryKey: ['get-next-free-date'], queryFn: getNextFreeDate })
 
     if (totalSpentError) return 'An error has occurred: ' + totalSpentError.message
+    if (nextDateError) return 'An error has occurred: ' + nextDateError.message
 
     return (
         <>
@@ -47,7 +48,7 @@ function Index() {
                         <CardTitle>Ausgaben</CardTitle>
                         <CardDescription>Alle Ausgaben addiert:</CardDescription>
                     </CardHeader>
-                    <CardContent>{totalIsPending ? "Loading..." : (totalSpent.total + ' CHF')}</CardContent>
+                    <CardContent>{totalIsPending || !totalSpent ? "Loading..." : ((totalSpent.total ?? '0') + ' CHF')}</CardContent>
                 </Card>
             </div>
             <div className='mr-2 ml-2'>
@@ -56,8 +57,8 @@ function Index() {
                         <CardTitle>Giessen</CardTitle>
                         <CardDescription>Nächster offener Tag:</CardDescription>
                     </CardHeader>
-                    <CardContent>{nextDateIsPending ? "Loading..." : ('in ' + nextDate.numberOfDays + ' Tagen')}</CardContent>
-                    <CardContent>{nextDateIsPending ? "Loading..." : ('Datum: ' + nextDate.nextFreeDate)}</CardContent>
+                    <CardContent>{nextDateIsPending || !nextDate ? "Loading..." : ('in ' + nextDate.numberOfDays + ' Tagen')}</CardContent>
+                    <CardContent>{nextDateIsPending || !nextDate ? "Loading..." : ('Datum: ' + nextDate.nextFreeDate)}</CardContent>
                 </Card>
             </div>
         </>

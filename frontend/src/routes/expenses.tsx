@@ -28,8 +28,11 @@ async function getAllExpenses() {
     return data
 }
 
-async function handleDelete(id: string) {
-    await api.expenses[':id{[0-9]+}'].$delete({ param: { id } })
+async function handleDelete(id: number) {
+    const res = await api.expenses[':id{[0-9]+}'].$delete({ param: { id: String(id) } })
+    if (!res.ok) {
+        throw new Error('Network response was not ok')
+    }
 }
 
 function Expenses() {

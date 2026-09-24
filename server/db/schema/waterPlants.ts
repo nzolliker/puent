@@ -1,5 +1,4 @@
 import {
-  decimal,
   mysqlTable,
   serial,
   text,

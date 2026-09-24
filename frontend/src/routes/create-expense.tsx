@@ -7,22 +7,20 @@ import type { AnyFieldApi } from '@tanstack/react-form'
 import { api } from '@/lib/api'
 import { createExpenseFormSchema } from '@server/sharedTypes'
 import { Calendar } from '@/components/ui/calendar'
-import { date } from 'drizzle-orm/mysql-core'
 
 export const Route = createFileRoute('/create-expense')({
     component: CreateExpense,
 })
 
 function FieldInfo({ field }: { field: AnyFieldApi }) {
+    const error = field.state.meta.errors[0]
+    if (!field.state.meta.isTouched || !error) {
+        return null
+    }
+
     return (
-        <p className="error">
-            {
-                typeof field.state.meta.errors[0] === 'object' && (
-                    <div className={`error ${field.state.meta.errors[0].severity}`}>
-                        {field.state.meta.errors[0].message}
-                    </div>
-                )
-            }
+        <p className="mt-1 text-sm text-destructive">
+            {typeof error === 'object' ? error.message : String(error)}
         </p>
     )
 }
@@ -71,7 +69,7 @@ function CreateExpense() {
                                     onBlur={field.handleBlur}
                                     onChange={(e) => field.handleChange(e.target.value)}
                                 />
-                                {/* <FieldInfo field={field} /> */}
+                                <FieldInfo field={field} />
                             </>
                         )
                     }} />
@@ -90,7 +88,7 @@ function CreateExpense() {
                                     type="number"
                                     onChange={(e) => field.handleChange(e.target.value)}
                                 />
-                                {/* <FieldInfo field={field} /> */}
+                                <FieldInfo field={field} />
                             </>
                         )
                     }} />

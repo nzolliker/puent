@@ -8,7 +8,7 @@ import {
 } from "../db/schema/waterPlants";
 
 import { createWaterSchema } from "../sharedTypes";
-import { desc, sum, eq } from "drizzle-orm";
+import { desc } from "drizzle-orm";
 
 // helper functions
 function toDayKey(value: string | Date) {
