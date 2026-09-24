@@ -43,6 +43,13 @@
       "when": 1789684007337,
       "tag": "0005_water_date_not_null",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "5",
+      "when": 1790256608675,
+      "tag": "0006_photos_and_albums",
+      "breakpoints": true
     }
   ]
 }
