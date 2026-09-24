@@ -27,10 +27,20 @@ speaks; the code and this README are in English.
 - List all expenses, delete the ones entered by mistake.
 - Running total in CHF on the dashboard.
 
+**Fotos**
+- Upload several pictures at once, by file picker or drag and drop.
+- Optional albums ("Beet 1", "Kompost"), a caption and the date the picture was
+  taken. The selected album lives in the URL, so a filtered view can be shared.
+- Grid of thumbnails, tap for the full picture; the newest four also show on the
+  dashboard.
+- Every upload is re-encoded to two WebP files — a 2000px copy for the lightbox
+  and a 400px thumbnail for the grid. A 5 MB phone photo becomes about 320 KB,
+  the originals are discarded, and EXIF (including GPS) goes with them.
+
 **Not yet**
 - No login. Anyone who can reach the app can sign up for a day or add an expense.
   That is fine on a home network and is the first thing on the roadmap.
-- No tests and no CI.
+- No CI. The only automated test is the photo-upload end-to-end check below.
 - Expenses are a flat list — no per-person split, no settling up.
 
 ## Stack
@@ -47,6 +57,7 @@ speaks; the code and this README are in English.
 | Routing | TanStack Router (file-based) | `frontend/src/routes/` |
 | Data / forms | TanStack Query + TanStack Form | per-route query helpers |
 | Styling | Tailwind v4 + shadcn/Radix primitives | `frontend/src/components/ui/` |
+| Images | sharp (resize + WebP) | `server/lib/photoStorage.ts` |
 | Deployment | Docker Compose on a Raspberry Pi | [`DEPLOYMENT.md`](DEPLOYMENT.md) |
 
 The piece I like most: the frontend does not hand-write API calls. `server/app.ts`
@@ -77,6 +88,14 @@ request on the server and the form in the browser.
 | `POST` | `/api/expenses` | add an expense |
 | `GET` | `/api/expenses/total-spent` | sum of all amounts |
 | `GET` `DELETE` | `/api/expenses/:id` | fetch or remove one expense |
+| `GET` | `/api/photos?albumId=` | photos, newest first, optionally one album |
+| `POST` | `/api/photos` | multipart upload of one or more images |
+| `DELETE` | `/api/photos/:id` | remove a photo and both its files |
+| `GET` `POST` | `/api/albums` | list albums with photo counts, or add one |
+| `DELETE` | `/api/albums/:id` | remove an album; its photos move to "Ohne Album" |
+
+Uploaded files are served outside `/api`, at
+`/uploads/YYYY/MM/<key>.webp` and `/uploads/YYYY/MM/<key>.thumb.webp`.
 
 ## Repo layout
 
@@ -84,6 +103,8 @@ request on the server and the form in the browser.
 server/       Hono app, routes, Drizzle schemas, shared Zod schemas
 frontend/     React app (Vite); `bun run build` outputs to frontend/dist
 drizzle/      generated SQL migrations
+e2e/          browser test for the photo upload
+uploads/      photos written at runtime (a Docker volume in production)
 tutorials/    earlier React exercises — kept on purpose, not part of the app
 DEPLOYMENT.md the Raspberry Pi runbook
 ```
@@ -139,6 +160,28 @@ bun run db:migrate
 Commit the generated file in `drizzle/` together with the schema change —
 production applies the same files.
 
+## Testing
+
+There is one automated test, and it exists because the photo upload broke in
+four different ways that `curl` could not see. Half of that feature runs in the
+browser — HEIC decoding, the canvas conversion, the `FormData` the client
+builds — so the test drives a real browser:
+
+```bash
+bun run dev                    # :3000
+cd frontend && bun run dev     # :5173
+bun run test:e2e               # WebKit + Chromium, JPEG + HEIC
+```
+
+WebKit stands in for Safari, which is what the garden group uses. Chromium is
+there for the opposite reason: it cannot decode HEIC, so it proves the app says
+so instead of failing silently.
+
+`BASE=http://localhost:3000 bun run test:e2e` runs the same checks against the
+built frontend rather than the dev server.
+
+First run needs the browsers once: `bunx playwright install webkit chromium`.
+
 ## Deployment
 
 The app runs on a Raspberry Pi as a two-service Docker Compose stack: `app` (the
@@ -151,8 +194,6 @@ production, recovery — is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Roadmap
 
-- **Photo upload** — pictures of the plot attached to a date or a bed, so the
-  season is visible and not just tabulated.
 - **Plant & harvest logs** — what went into which bed and when, and what came
   back out. The part that makes the app useful next year, not just this week.
 - **Users & login** — real accounts instead of typing your name into a field, so

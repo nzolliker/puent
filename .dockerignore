@@ -1,0 +1,21 @@
+# Dependencies are installed inside the image. Without this, `COPY . .` would
+# overwrite them with the host's copy -- which breaks native binaries such as
+# sharp's, because the host is macOS/arm64 and the image is linux.
+node_modules
+frontend/node_modules
+
+# Built inside the image by `bun run build`
+frontend/dist
+
+# Uploaded photos live in a volume, never in the image
+uploads
+
+.git
+.gitignore
+.env
+.env.*
+.serena
+.claude
+tutorials
+*.md
+!README.md

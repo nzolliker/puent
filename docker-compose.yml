@@ -30,6 +30,11 @@ services:
       DATABASE_URL: ${DATABASE_URL}
       NODE_ENV: ${NODE_ENV}
       PORT: ${PORT}
+      UPLOAD_DIR: ${UPLOAD_DIR}
+    volumes:
+      # Uploaded photos. Without this they live in the container's writable
+      # layer and every rebuild deletes them.
+      - uploads:/app/uploads
     depends_on:
       - mysql
     ports:
@@ -37,3 +42,4 @@ services:
 
 volumes:
   mysql_data:
+  uploads:

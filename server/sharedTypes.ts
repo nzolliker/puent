@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { insertExpenseSchema, selectExpenseSchema } from "./db/schema/expenses";
+import { insertAlbumSchema } from "./db/schema/photos";
 import {
   insertWaterDateSchema,
 } from "./db/schema/waterPlants";
@@ -31,4 +32,27 @@ export const createWaterFormSchema = z.object({
 
 export const waterOverviewQuerySchema = z.object({
   days: z.coerce.number().int().min(0).max(14).default(3),
+});
+
+// photos
+export const createAlbumSchema = insertAlbumSchema.omit({
+  id: true,
+  createdAt: true,
+});
+
+export const createAlbumFormSchema = z.object({
+  name: z.string().min(1, { message: "Name erforderlich" }).max(80),
+});
+
+// The upload is multipart/form-data, so every field arrives as a string.
+// Empty strings mean "not set" and have to become undefined before parsing.
+export const photoMetadataSchema = z.object({
+  caption: z.string().max(500).optional(),
+  takenAt: z.coerce.date().optional(),
+  albumId: z.coerce.number().int().positive().optional(),
+});
+
+export const photosQuerySchema = z.object({
+  albumId: z.coerce.number().int().positive().optional(),
+  limit: z.coerce.number().int().min(1).max(100).optional(),
 });

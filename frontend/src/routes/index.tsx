@@ -12,6 +12,7 @@ import {
 import { useQuery } from '@tanstack/react-query'
 import { api } from "@/lib/api"
 import { cn, dayKeyToDate, formatWeekday, getFirstName } from "@/lib/utils"
+import { getPhotos, photoUrl } from "@/lib/photos"
 
 export const Route = createFileRoute('/')({
     component: Index,
@@ -112,10 +113,41 @@ function WaterOverviewStrip({ overview }: { overview: WaterOverview }) {
     )
 }
 
+type LatestPhoto = Awaited<ReturnType<typeof getPhotos>>['photos'][number]
+
+function LatestPhotosStrip({ photos }: { photos: LatestPhoto[] }) {
+    if (photos.length === 0) {
+        return <span className="text-sm text-muted-foreground">Noch keine Fotos.</span>
+    }
+
+    return (
+        <div className="grid grid-cols-4 gap-1">
+            {photos.slice(0, 4).map((photo) => (
+                <Link
+                    key={photo.id}
+                    to="/fotos"
+                    className="aspect-square overflow-hidden rounded-md bg-muted"
+                >
+                    <img
+                        src={photoUrl(photo.storageKey)}
+                        alt={photo.caption ?? ''}
+                        width={photo.width}
+                        height={photo.height}
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                    />
+                </Link>
+            ))}
+        </div>
+    )
+}
+
 function Index() {
     const { isPending: totalIsPending, error: totalSpentError, data: totalSpent } = useQuery({ queryKey: ['get-total-spent'], queryFn: getTotalSpent })
     const { isPending: nextDateIsPending, error: nextDateError, data: nextDate } = useQuery({ queryKey: ['get-next-free-date'], queryFn: getNextFreeDate })
     const { isPending: overviewIsPending, error: overviewError, data: overview } = useQuery({ queryKey: ['get-water-overview'], queryFn: getWaterOverview })
+    const { isPending: photosIsPending, data: photoData } = useQuery({ queryKey: ['get-photos', null], queryFn: () => getPhotos() })
 
     if (totalSpentError) return 'An error has occurred: ' + totalSpentError.message
     if (nextDateError) return 'An error has occurred: ' + nextDateError.message
@@ -154,6 +186,24 @@ function Index() {
                     {overview && (
                         <CardFooter className="text-sm text-muted-foreground">
                             {overview.openCount} von {overview.days.length} Tagen offen
+                        </CardFooter>
+                    )}
+                </Card>
+            </div>
+            <div className='mr-2 ml-2'>
+                <Card className="w-full max-w-sm m-auto mt-3">
+                    <CardHeader>
+                        <CardTitle>Neueste Fotos</CardTitle>
+                        <CardDescription>Vom Garten:</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {photosIsPending || !photoData ? "Loading..." : <LatestPhotosStrip photos={photoData.photos} />}
+                    </CardContent>
+                    {photoData && (
+                        <CardFooter className="text-sm text-muted-foreground">
+                            <Link to="/fotos" className="hover:underline">
+                                {photoData.photos.length} {photoData.photos.length === 1 ? 'Bild' : 'Bilder'} ansehen
+                            </Link>
                         </CardFooter>
                     )}
                 </Card>

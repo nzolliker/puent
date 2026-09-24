@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WaterPlantsRouteImport } from './routes/waterPlants'
+import { Route as FotosRouteImport } from './routes/fotos'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as CreateExpenseRouteImport } from './routes/create-expense'
 import { Route as IndexRouteImport } from './routes/index'
@@ -17,6 +18,11 @@ import { Route as IndexRouteImport } from './routes/index'
 const WaterPlantsRoute = WaterPlantsRouteImport.update({
   id: '/waterPlants',
   path: '/waterPlants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FotosRoute = FotosRouteImport.update({
+  id: '/fotos',
+  path: '/fotos',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ExpensesRoute = ExpensesRouteImport.update({
@@ -39,12 +45,14 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/create-expense': typeof CreateExpenseRoute
   '/expenses': typeof ExpensesRoute
+  '/fotos': typeof FotosRoute
   '/waterPlants': typeof WaterPlantsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/create-expense': typeof CreateExpenseRoute
   '/expenses': typeof ExpensesRoute
+  '/fotos': typeof FotosRoute
   '/waterPlants': typeof WaterPlantsRoute
 }
 export interface FileRoutesById {
@@ -52,20 +60,28 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/create-expense': typeof CreateExpenseRoute
   '/expenses': typeof ExpensesRoute
+  '/fotos': typeof FotosRoute
   '/waterPlants': typeof WaterPlantsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/create-expense' | '/expenses' | '/waterPlants'
+  fullPaths: '/' | '/create-expense' | '/expenses' | '/fotos' | '/waterPlants'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/create-expense' | '/expenses' | '/waterPlants'
-  id: '__root__' | '/' | '/create-expense' | '/expenses' | '/waterPlants'
+  to: '/' | '/create-expense' | '/expenses' | '/fotos' | '/waterPlants'
+  id:
+    | '__root__'
+    | '/'
+    | '/create-expense'
+    | '/expenses'
+    | '/fotos'
+    | '/waterPlants'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CreateExpenseRoute: typeof CreateExpenseRoute
   ExpensesRoute: typeof ExpensesRoute
+  FotosRoute: typeof FotosRoute
   WaterPlantsRoute: typeof WaterPlantsRoute
 }
 
@@ -76,6 +92,13 @@ declare module '@tanstack/react-router' {
       path: '/waterPlants'
       fullPath: '/waterPlants'
       preLoaderRoute: typeof WaterPlantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fotos': {
+      id: '/fotos'
+      path: '/fotos'
+      fullPath: '/fotos'
+      preLoaderRoute: typeof FotosRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/expenses': {
@@ -106,6 +129,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CreateExpenseRoute: CreateExpenseRoute,
   ExpensesRoute: ExpensesRoute,
+  FotosRoute: FotosRoute,
   WaterPlantsRoute: WaterPlantsRoute,
 }
 export const routeTree = rootRouteImport

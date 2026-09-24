@@ -107,12 +107,19 @@ COPY . .
 
 The volume is Docker-managed persistent storage.
 
-Example:
+There are two of them:
 
-- Compose volume name: `puent_mysql_data`
-- Mounted inside MySQL container at: `/var/lib/mysql`
+| Compose volume | Mounted at | Contains |
+| --- | --- | --- |
+| `puent_mysql_data` | `/var/lib/mysql` (mysql container) | the production database files |
+| `puent_uploads` | `/app/uploads` (app container) | uploaded photos, as WebP |
 
-This is where the production database files live. Rebuilding the app image does not remove this data.
+This is where the production database files and the uploaded photos live.
+Rebuilding the app image does not remove either.
+
+The photo volume matters as much as the database one: without it, photos would
+sit in the app container's writable layer and every `docker compose build app`
+would delete them.
 
 ## Important Files
 
@@ -152,6 +159,11 @@ It contains values such as:
 - `MYSQL_PASSWORD`
 - `MYSQL_ROOT_PASSWORD`
 - `DATABASE_URL`
+- `UPLOAD_DIR=/app/uploads`
+
+`UPLOAD_DIR` has to be set here because `docker-compose.yml` lists the app's
+environment variables explicitly rather than passing the whole file through.
+It must point at the mount path of the `uploads` volume.
 
 ### `drizzle.config.ts`
 
@@ -474,20 +486,30 @@ docker volume rm big-tutorial-2024_mysql_data
 
 ## Persistent Data Warning
 
-Production MySQL data is stored in the Docker volume, not in Git.
+Production MySQL data and uploaded photos are stored in Docker volumes, not in
+Git.
 
 That means:
 
-- `git pull` does not affect production DB data
-- rebuilding the app image does not affect production DB data
-- restarting containers does not affect production DB data
+- `git pull` does not affect production DB data or photos
+- rebuilding the app image does not affect production DB data or photos
+- restarting containers does not affect production DB data or photos
 
 But:
 
 - `docker compose down -v`
 - `docker volume rm ...`
 
-can destroy the production database if used carelessly.
+can destroy the production database **and every uploaded photo** if used
+carelessly.
+
+Neither volume is backed up yet. Photos are the one kind of data here that
+cannot be recreated by re-entering it, so a copy is worth taking:
+
+```bash
+docker run --rm -v puent_uploads:/data -v "$PWD":/backup alpine \
+  tar czf /backup/uploads-$(date +%F).tar.gz -C /data .
+```
 
 ## What Is Safe To Recreate
 
