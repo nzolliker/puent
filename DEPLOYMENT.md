@@ -446,6 +446,19 @@ This order works well for this project because:
 
 ## One-Time Migration: Project Moved To Repo Root
 
+**Done on 2026-09-24, together with the photo-upload deploy.** Kept here as a record of
+what the move involved; there is nothing left to run. Two things were easy to miss and are
+worth knowing if a similar move ever happens again:
+
+- The Git checkout had already been pulled to the new layout months earlier, but the
+  *running stack* was still the old Compose project. Nothing about `git status` or the app
+  being up hinted at that — only `docker inspect` on the container showed the old
+  `com.docker.compose.project` label and the `big-tutorial-2024_mysql_data` mount.
+- `.env.production` is gitignored, so `git pull` left it behind in the old directory while
+  every tracked file moved to the root. Compose then found no env file at the new path.
+  Starting the new stack at that point would have run MySQL with empty credentials against
+  a fresh, empty volume.
+
 The project used to live in `sam-tutorial/big-tutorial-2024/` inside the repo. It now sits at
 the repo root (`/home/nzolliker/repos/puent`), and the other tutorials moved to `tutorials/`.
 
@@ -457,13 +470,20 @@ The MySQL volume is named after the project, so the existing `big-tutorial-2024_
 volume has to be copied over once. Do this on the Pi, in this order:
 
 ```bash
-# 1. stop the OLD stack, from the OLD path, BEFORE pulling
-cd /home/nzolliker/repos/puent/sam-tutorial/big-tutorial-2024
-docker compose down
+# 1. stop the OLD stack, BEFORE pulling.
+#    `docker compose down` from the old path only works while its
+#    docker-compose.yml is still there. Once the pull has moved it, stop the
+#    containers by name instead -- named volumes survive `rm`:
+docker stop puent-app puent-mysql && docker rm puent-app puent-mysql
 
 # 2. pull the new layout
 cd /home/nzolliker/repos/puent
 git pull
+
+# 2b. carry the production env file over -- it is gitignored, so the pull
+#     leaves it in the old directory
+cp -p sam-tutorial/big-tutorial-2024/.env.production .env.production
+echo 'UPLOAD_DIR=/app/uploads' >> .env.production
 
 # 3. copy the database volume to its new name
 docker volume create puent_mysql_data
@@ -477,8 +497,13 @@ docker compose up -d
 docker compose logs -f app
 ```
 
+Compose warns that `puent_mysql_data` "already exists but was not created by Docker
+Compose". That is expected here -- it means it is using the volume the copy just filled,
+which is the whole point.
+
 Keep `big-tutorial-2024_mysql_data` around until you have confirmed the app sees the old data.
-Only then remove it:
+As of 2026-09-24 it is confirmed and the old volume is still present, so it can be removed
+whenever you want the space back:
 
 ```bash
 docker volume rm big-tutorial-2024_mysql_data
