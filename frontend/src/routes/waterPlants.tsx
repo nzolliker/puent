@@ -194,7 +194,6 @@ function Giessen() {
         mutationFn: handleEnroll,
         onSuccess: async () => {
             await queryClient.invalidateQueries({ queryKey: ['get-all-water-dates'] })
-            await queryClient.invalidateQueries({ queryKey: ['get-next-free-date'] })
             await queryClient.invalidateQueries({ queryKey: ['get-water-overview'] })
             form.setFieldValue('date', null)
             closeDialog()

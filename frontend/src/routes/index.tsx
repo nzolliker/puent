@@ -27,15 +27,6 @@ async function getTotalSpent() {
     return data
 }
 
-async function getNextFreeDate() {
-    const response = await api["water-plants"]["next-free-date"].$get()
-    if (!response.ok) {
-        throw new Error('Network response was not ok')
-    }
-    const data = await response.json()
-    return data
-}
-
 async function getWaterOverview() {
     const response = await api["water-plants"].overview.$get({ query: {} })
     if (!response.ok) {
@@ -145,12 +136,10 @@ function LatestPhotosStrip({ photos }: { photos: LatestPhoto[] }) {
 
 function Index() {
     const { isPending: totalIsPending, error: totalSpentError, data: totalSpent } = useQuery({ queryKey: ['get-total-spent'], queryFn: getTotalSpent })
-    const { isPending: nextDateIsPending, error: nextDateError, data: nextDate } = useQuery({ queryKey: ['get-next-free-date'], queryFn: getNextFreeDate })
     const { isPending: overviewIsPending, error: overviewError, data: overview } = useQuery({ queryKey: ['get-water-overview'], queryFn: getWaterOverview })
     const { isPending: photosIsPending, data: photoData } = useQuery({ queryKey: ['get-photos', null], queryFn: () => getPhotos() })
 
     if (totalSpentError) return 'An error has occurred: ' + totalSpentError.message
-    if (nextDateError) return 'An error has occurred: ' + nextDateError.message
     if (overviewError) return 'An error has occurred: ' + overviewError.message
 
     return (
@@ -158,20 +147,19 @@ function Index() {
             <div className='mr-2 ml-2'>
                 <Card className="w-full max-w-sm m-auto mt-3">
                     <CardHeader>
-                        <CardTitle>Ausgaben</CardTitle>
-                        <CardDescription>Alle Ausgaben addiert:</CardDescription>
+                        <CardTitle>Neueste Fotos</CardTitle>
+                        <CardDescription>Vom Garten:</CardDescription>
                     </CardHeader>
-                    <CardContent>{totalIsPending || !totalSpent ? "Loading..." : ((totalSpent.total ?? '0') + ' CHF')}</CardContent>
-                </Card>
-            </div>
-            <div className='mr-2 ml-2'>
-                <Card className="w-full max-w-sm m-auto mt-3">
-                    <CardHeader>
-                        <CardTitle>Giessen</CardTitle>
-                        <CardDescription>Nächster offener Tag:</CardDescription>
-                    </CardHeader>
-                    <CardContent>{nextDateIsPending || !nextDate ? "Loading..." : ('in ' + nextDate.numberOfDays + ' Tagen')}</CardContent>
-                    <CardContent>{nextDateIsPending || !nextDate ? "Loading..." : ('Datum: ' + nextDate.nextFreeDate)}</CardContent>
+                    <CardContent>
+                        {photosIsPending || !photoData ? "Loading..." : <LatestPhotosStrip photos={photoData.photos} />}
+                    </CardContent>
+                    {photoData && (
+                        <CardFooter className="text-sm text-muted-foreground">
+                            <Link to="/fotos" className="hover:underline">
+                                {photoData.photos.length} {photoData.photos.length === 1 ? 'Bild' : 'Bilder'} ansehen
+                            </Link>
+                        </CardFooter>
+                    )}
                 </Card>
             </div>
             <div className='mr-2 ml-2'>
@@ -193,19 +181,10 @@ function Index() {
             <div className='mr-2 ml-2'>
                 <Card className="w-full max-w-sm m-auto mt-3">
                     <CardHeader>
-                        <CardTitle>Neueste Fotos</CardTitle>
-                        <CardDescription>Vom Garten:</CardDescription>
+                        <CardTitle>Ausgaben</CardTitle>
+                        <CardDescription>Alle Ausgaben addiert:</CardDescription>
                     </CardHeader>
-                    <CardContent>
-                        {photosIsPending || !photoData ? "Loading..." : <LatestPhotosStrip photos={photoData.photos} />}
-                    </CardContent>
-                    {photoData && (
-                        <CardFooter className="text-sm text-muted-foreground">
-                            <Link to="/fotos" className="hover:underline">
-                                {photoData.photos.length} {photoData.photos.length === 1 ? 'Bild' : 'Bilder'} ansehen
-                            </Link>
-                        </CardFooter>
-                    )}
+                    <CardContent>{totalIsPending || !totalSpent ? "Loading..." : ((totalSpent.total ?? '0') + ' CHF')}</CardContent>
                 </Card>
             </div>
         </>
