@@ -72,14 +72,18 @@ const EXPENSES = [
 ]
 
 /**
- * Albums are matched to the photos that happen to be in uploads/, by caption.
- * A photo with no match stays under "Ohne Album" -- which is worth showing,
- * since that is the state most photos are in.
+ * Albums are filled from whatever photos are in the database, newest first,
+ * rather than matched on a caption -- captions change, and a seed that
+ * silently assigns nothing is worse than no seed at all. Anything left over
+ * stays under "Ohne Album", which is the state most photos are in anyway.
  */
 const ALBUMS = [
-  { name: 'Beet 1', captions: ['Jätte'] },
-  { name: 'Pergola', captions: ['Pergola'] },
+  { name: 'Beet 1', photos: 2 },
+  { name: 'Ernte', photos: 1 },
 ]
+
+/** Describe the sample photos, applied newest first where one is missing. */
+const CAPTIONS = ['Salat und Kabis', 'Kohlrabi', 'Ernte']
 
 const db = await mysql.createConnection(url)
 
@@ -97,19 +101,36 @@ try {
   // Photos outlive albums: the FK is ON DELETE SET NULL, so clearing the
   // albums table detaches the photos instead of deleting them.
   await db.query('DELETE FROM `albums`')
-  for (const { name, captions } of ALBUMS) {
+  const [rows] = await db.query(
+    'SELECT `id` FROM `photos` ORDER BY `created_at` DESC, `id` DESC',
+  )
+  const ids = rows.map((row) => row.id)
+
+  let taken = 0
+  for (const { name, photos } of ALBUMS) {
     const [{ insertId }] = await db.query('INSERT INTO `albums` (`name`) VALUES (?)', [name])
-    const [result] = await db.query(
-      'UPDATE `photos` SET `album_id` = ? WHERE `caption` IN (?)',
-      [insertId, captions],
-    )
-    console.log(`  album        ${name} -- ${result.affectedRows} photo(s)`)
+    const slice = ids.slice(taken, taken + photos)
+    taken += slice.length
+    if (slice.length > 0) {
+      await db.query('UPDATE `photos` SET `album_id` = ? WHERE `id` IN (?)', [insertId, slice])
+    }
+    console.log(`  album        ${name} -- ${slice.length} photo(s)`)
   }
 
-  const [[{ photos }]] = await db.query('SELECT COUNT(*) AS photos FROM `photos`')
-  if (photos === 0) {
+  // COALESCE so a photo that was captioned by hand keeps what it was given.
+  for (const [index, id] of ids.entries()) {
+    if (!CAPTIONS[index]) continue
+    await db.query(
+      'UPDATE `photos` SET `caption` = COALESCE(`caption`, ?) WHERE `id` = ?',
+      [CAPTIONS[index], id],
+    )
+  }
+
+  if (ids.length === 0) {
     console.log('\n  Note: no photos in the database. Upload a few through /fotos --')
     console.log('  a photo row without its file in uploads/ renders as a broken image.')
+  } else {
+    console.log(`  photos       ${ids.length} found, ${ids.length - taken} left under "Ohne Album"`)
   }
 
   console.log('\nDone.')

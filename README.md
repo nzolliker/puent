@@ -57,7 +57,7 @@ change instead of quietly going stale.
 
 **Fotos**
 - Upload several pictures at once, by file picker or drag and drop.
-- Optional albums ("Beet 1", "Kompost"), a caption and the date the picture was
+- Optional albums ("Beet 1", "Ernte"), a caption and the date the picture was
   taken. The selected album lives in the URL, so a filtered view can be shared.
 - Grid of thumbnails, tap for the full picture; the newest four also show on the
   dashboard.
