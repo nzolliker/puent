@@ -19,7 +19,8 @@ speaks; the code and this README are in English.
 - Dashboard strip showing the week around today: who has signed up, which days
   are still open, and how many of them there are.
 - Clicking an open day jumps to the calendar with that date preselected.
-- "Next free day" tells you the first day nobody has claimed yet.
+- "Next free day" is still an API endpoint, but no longer a dashboard card —
+  the week strip shows the same thing in context.
 - Signing up is a name and a date — one row in the `waterPlants` table.
 
 **Shared expenses**
