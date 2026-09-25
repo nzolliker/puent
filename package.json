@@ -8,6 +8,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
+    "demo-data": "bun scripts/demo-data.mjs",
+    "screenshots": "bun scripts/screenshots.mjs",
     "test:e2e": "bun e2e/upload.mjs"
   },
   "private": true,
