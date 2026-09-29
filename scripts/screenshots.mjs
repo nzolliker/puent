@@ -61,6 +61,18 @@ const shots = [
     cropTo: '[role=dialog]',
   },
   {
+    file: '07-aufgaben.webp',
+    path: '/aufgaben',
+    ready: (page) => page.getByRole('button', { name: 'Neue Aufgabe' }).waitFor(),
+  },
+  {
+    file: '08-aufgaben-verlauf.webp',
+    path: '/aufgaben',
+    prepare: (page) => page.getByRole('button', { name: 'Verlauf' }).click(),
+    ready: (page) => page.getByRole('dialog').waitFor(),
+    cropTo: '[role=dialog]',
+  },
+  {
     file: '06-ausgaben.webp',
     path: '/expenses',
     ready: (page) => page.getByRole('button', { name: 'Neuer Eintrag' }).waitFor(),
