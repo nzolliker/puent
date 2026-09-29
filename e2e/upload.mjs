@@ -20,6 +20,32 @@ const BASE = process.env.BASE ?? 'http://localhost:5173'
 const dir = mkdtempSync(join(tmpdir(), 'puent-e2e-'))
 let failures = 0
 
+/**
+ * Every id this run uploaded, removed again at the end.
+ *
+ * The test drives the real app against the real database, so without this the
+ * nine photos a run creates stay there -- and since `bun run demo-data`
+ * deliberately leaves photos alone, nothing else ever clears them. A few runs
+ * and the gallery is copies of the two fixtures.
+ */
+const uploaded = []
+
+/** The reads still in flight, so a crash mid-run still cleans up what it made. */
+const pending = []
+
+/** Collects the ids out of a POST /api/photos response, for the cleanup. */
+function collect(response) {
+  const read = response
+    .json()
+    .then((body) => {
+      for (const photo of body?.photos ?? []) uploaded.push(photo.id)
+    })
+    .catch(() => {})
+
+  pending.push(read)
+  return read
+}
+
 function check(label, actual, expected) {
   const ok = actual === expected
   console.log(`  ${ok ? 'ok  ' : 'FAIL'}  ${label}: ${actual}${ok ? '' : ` (erwartet ${expected})`}`)
@@ -48,8 +74,12 @@ async function uploadMany(file, copies = 6) {
   const browser = await webkit.launch()
   const page = await browser.newPage()
   let status = null
+  const bodies = []
   page.on('response', (r) => {
-    if (r.url().includes('/api/photos') && r.request().method() === 'POST') status = r.status()
+    if (r.url().includes('/api/photos') && r.request().method() === 'POST') {
+      status = r.status()
+      bodies.push(collect(r))
+    }
   })
   await page.goto(`${BASE}/fotos`, { waitUntil: 'networkidle' })
   const before = await page.locator('img[src^="/uploads"]').count()
@@ -59,6 +89,7 @@ async function uploadMany(file, copies = 6) {
   await page.waitForTimeout(30000)
   check(`${copies} grosse Fotos: POST-Status`, status, 201)
   check(`${copies} grosse Fotos: alle im Grid`, await page.locator('img[src^="/uploads"]').count(), before + copies)
+  await Promise.all(bodies)
   await browser.close()
 }
 
@@ -67,9 +98,13 @@ async function upload(browserType, name, file, expectUpload) {
   const page = await browser.newPage()
   let status = null
   const errors = []
+  const bodies = []
   page.on('pageerror', (e) => errors.push(e.message))
   page.on('response', (r) => {
-    if (r.url().includes('/api/photos') && r.request().method() === 'POST') status = r.status()
+    if (r.url().includes('/api/photos') && r.request().method() === 'POST') {
+      status = r.status()
+      bodies.push(collect(r))
+    }
   })
 
   await page.goto(`${BASE}/fotos`, { waitUntil: 'networkidle' })
@@ -99,24 +134,55 @@ async function upload(browserType, name, file, expectUpload) {
     console.log(`        -> ${shown[0] ?? '(nichts)'}`)
   }
   check(`${name}: keine JS-Fehler`, errors.length, 0)
+  await Promise.all(bodies)
   await browser.close()
+}
+
+/**
+ * Puts the database back. DELETE /api/photos/:id removes both WebP files with
+ * the row, so this is the same cleanup a person clicking the bin would do.
+ *
+ * In a `finally`, because a failed check is exactly when the leftovers are
+ * least welcome: the next run would start against a gallery full of fixtures.
+ */
+async function cleanup() {
+  // A throw can land between the upload and the response body being read.
+  await Promise.allSettled(pending)
+  if (uploaded.length === 0) return
+
+  let removed = 0
+  for (const id of uploaded) {
+    const res = await fetch(`${BASE}/api/photos/${id}`, { method: 'DELETE' })
+    if (res.ok) removed++
+  }
+
+  const leaked = uploaded.length - removed
+  console.log(
+    `\nAufgeräumt: ${removed} Test-Foto(s) gelöscht` +
+      (leaked ? ` -- ${leaked} nicht, bitte in /fotos nachsehen` : ''),
+  )
 }
 
 const { jpeg, heic } = fixtures()
 console.log(`\nZiel: ${BASE}\n`)
-console.log('WebKit (Safari)')
-await upload(webkit, 'JPEG', jpeg, true)
-await upload(webkit, 'HEIC', heic, true)
-console.log('Chromium (kann HEIC nicht dekodieren)')
-await upload(chromium, 'JPEG', jpeg, true)
-await upload(chromium, 'HEIC', heic, false)
 
-const sample = 'examples/IMG_7396.jpeg'
-if (existsSync(sample)) {
-  console.log('Mehrfach-Upload (echtes iPhone-Foto)')
-  await uploadMany(sample)
-} else {
-  console.log(`Mehrfach-Upload übersprungen: ${sample} fehlt`)
+try {
+  console.log('WebKit (Safari)')
+  await upload(webkit, 'JPEG', jpeg, true)
+  await upload(webkit, 'HEIC', heic, true)
+  console.log('Chromium (kann HEIC nicht dekodieren)')
+  await upload(chromium, 'JPEG', jpeg, true)
+  await upload(chromium, 'HEIC', heic, false)
+
+  const sample = 'examples/IMG_7396.jpeg'
+  if (existsSync(sample)) {
+    console.log('Mehrfach-Upload (echtes iPhone-Foto)')
+    await uploadMany(sample)
+  } else {
+    console.log(`Mehrfach-Upload übersprungen: ${sample} fehlt`)
+  }
+} finally {
+  await cleanup()
 }
 
 console.log(failures === 0 ? '\nAlles grün.\n' : `\n${failures} Prüfung(en) fehlgeschlagen.\n`)

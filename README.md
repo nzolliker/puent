@@ -55,6 +55,21 @@ change instead of quietly going stale.
 
 <img src="docs/screenshots/06-ausgaben.webp" alt="Expenses table with six rows, amounts and delete buttons" width="440">
 
+**Aufgaben**
+- The jobs that are not watering: weeding, fence repair, picking up compost.
+- Add one with a title, tick it off when it is done.
+- Ticking does not delete it. Finished jobs move into the **Verlauf** dialog
+  with the date they were done, and the undo arrow there puts one back on the
+  open list — a mis-tick is one click, not a retype.
+- The dashboard card shows how many are still open and the two newest.
+
+<table>
+<tr>
+<td width="50%"><img src="docs/screenshots/07-aufgaben.webp" alt="Aufgaben page with four open jobs, each with a tick and a delete button"><br><sub><b>Aufgaben</b> — tick on the left, delete on the right.</sub></td>
+<td width="50%"><img src="docs/screenshots/08-aufgaben-verlauf.webp" alt="Verlauf dialog listing three finished jobs, struck through, with their dates and an undo button"><br><sub><b>Verlauf</b> — what has been done, and the arrow that puts one back.</sub></td>
+</tr>
+</table>
+
 **Fotos**
 - Upload several pictures at once, by file picker or drag and drop.
 - Optional albums ("Beet 1", "Ernte"), a caption and the date the picture was
@@ -139,6 +154,11 @@ so instead of failing silently.
 `BASE=http://localhost:3000 bun run test:e2e` runs the same checks against the
 built frontend rather than the dev server.
 
+The test uploads into whatever database it is pointed at, so it deletes the nine
+photos it creates again on the way out — including when a check fails. `bun run
+demo-data` deliberately leaves photos alone, so without that teardown every run
+would leave copies of the two fixtures behind for good.
+
 First run needs the browsers once: `bunx playwright install webkit chromium`.
 
 ## Deployment
@@ -157,8 +177,6 @@ production, recovery — is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
   back out. The part that makes the app useful next year, not just this week.
 - **Users & login** — real accounts instead of typing your name into a field, so
   entries belong to someone and the app can leave the home network.
-- **Shared to-do list** — the jobs that are not watering: weeding, fence repair,
-  picking up compost.
 
 ## Running it locally
 
@@ -228,6 +246,11 @@ images in this README (it needs the app running).
 | `POST` | `/api/photos` | multipart upload of one or more images |
 | `DELETE` | `/api/photos/:id` | remove a photo and both its files |
 | `GET` `POST` | `/api/albums` | list albums with photo counts, or add one |
+| `GET` | `/api/todos` | open to-dos, newest first |
+| `POST` | `/api/todos` | add a to-do |
+| `GET` | `/api/todos/history` | finished to-dos, most recently finished first |
+| `PATCH` | `/api/todos/:id` | tick one off, or put it back (`{ "done": true }`) |
+| `DELETE` | `/api/todos/:id` | remove one |
 | `DELETE` | `/api/albums/:id` | remove an album; its photos move to "Ohne Album" |
 
 Uploaded files are served outside `/api`, at

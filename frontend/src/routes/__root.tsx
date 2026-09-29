@@ -14,6 +14,9 @@ function NavBar() {
                 <Link to="/expenses" className="[&.active]:font-bold">
                     Ausgaben
                 </Link>
+                <Link to="/aufgaben" className="[&.active]:font-bold">
+                    Aufgaben
+                </Link>
                 <Link to="/fotos" className="[&.active]:font-bold">
                     Fotos
                 </Link>
