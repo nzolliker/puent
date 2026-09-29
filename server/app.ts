@@ -4,6 +4,7 @@ import { expensesRoutes } from "./routes/expenses";
 import { waterPlantsRoutes } from "./routes/waterPlants";
 import { photosRoutes } from "./routes/photos";
 import { albumsRoutes } from "./routes/albums";
+import { todosRoutes } from "./routes/todos";
 import { serveStatic } from "hono/bun";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
@@ -19,6 +20,7 @@ const expensesApi = api.route("/expenses", expensesRoutes);
 const waterPlantsApi = api.route("/water-plants", waterPlantsRoutes);
 const photosApi = api.route("/photos", photosRoutes);
 const albumsApi = api.route("/albums", albumsRoutes);
+const todosApi = api.route("/todos", todosRoutes);
 //
 
 //const apiRoutes = app.basePath("/api").route("/expenses", expensesRoutes)
@@ -72,4 +74,5 @@ export type ApiRoutes =
   | typeof expensesApi
   | typeof waterPlantsApi
   | typeof photosApi
-  | typeof albumsApi;
+  | typeof albumsApi
+  | typeof todosApi;

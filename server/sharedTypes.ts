@@ -4,6 +4,7 @@ import { insertAlbumSchema } from "./db/schema/photos";
 import {
   insertWaterDateSchema,
 } from "./db/schema/waterPlants";
+import { insertTodoSchema, selectTodoSchema } from "./db/schema/todos";
 
 // expenses
 export const createExpenseSchema = insertExpenseSchema.omit({
@@ -55,4 +56,23 @@ export const photoMetadataSchema = z.object({
 export const photosQuerySchema = z.object({
   albumId: z.coerce.number().int().positive().optional(),
   limit: z.coerce.number().int().min(1).max(100).optional(),
+});
+
+// todos
+export const createTodoSchema = insertTodoSchema.omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+export const createTodoFormSchema = selectTodoSchema.omit({
+  id: true,
+  createdAt: true,
+  completedAt: true,
+});
+
+// Ticking a to-do and undoing it are the same call, so the body carries the
+// state to move to rather than the action taken.
+export const setTodoDoneSchema = z.object({
+  done: z.boolean(),
 });

@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as WaterPlantsRouteImport } from './routes/waterPlants'
 import { Route as FotosRouteImport } from './routes/fotos'
 import { Route as ExpensesRouteImport } from './routes/expenses'
+import { Route as AufgabenRouteImport } from './routes/aufgaben'
 import { Route as IndexRouteImport } from './routes/index'
 
 const WaterPlantsRoute = WaterPlantsRouteImport.update({
@@ -29,6 +30,11 @@ const ExpensesRoute = ExpensesRouteImport.update({
   path: '/expenses',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AufgabenRoute = AufgabenRouteImport.update({
+  id: '/aufgaben',
+  path: '/aufgaben',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
@@ -37,12 +43,14 @@ const IndexRoute = IndexRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/aufgaben': typeof AufgabenRoute
   '/expenses': typeof ExpensesRoute
   '/fotos': typeof FotosRoute
   '/waterPlants': typeof WaterPlantsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/aufgaben': typeof AufgabenRoute
   '/expenses': typeof ExpensesRoute
   '/fotos': typeof FotosRoute
   '/waterPlants': typeof WaterPlantsRoute
@@ -50,20 +58,22 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/aufgaben': typeof AufgabenRoute
   '/expenses': typeof ExpensesRoute
   '/fotos': typeof FotosRoute
   '/waterPlants': typeof WaterPlantsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/expenses' | '/fotos' | '/waterPlants'
+  fullPaths: '/' | '/aufgaben' | '/expenses' | '/fotos' | '/waterPlants'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/expenses' | '/fotos' | '/waterPlants'
-  id: '__root__' | '/' | '/expenses' | '/fotos' | '/waterPlants'
+  to: '/' | '/aufgaben' | '/expenses' | '/fotos' | '/waterPlants'
+  id: '__root__' | '/' | '/aufgaben' | '/expenses' | '/fotos' | '/waterPlants'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AufgabenRoute: typeof AufgabenRoute
   ExpensesRoute: typeof ExpensesRoute
   FotosRoute: typeof FotosRoute
   WaterPlantsRoute: typeof WaterPlantsRoute
@@ -92,6 +102,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ExpensesRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/aufgaben': {
+      id: '/aufgaben'
+      path: '/aufgaben'
+      fullPath: '/aufgaben'
+      preLoaderRoute: typeof AufgabenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -104,6 +121,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AufgabenRoute: AufgabenRoute,
   ExpensesRoute: ExpensesRoute,
   FotosRoute: FotosRoute,
   WaterPlantsRoute: WaterPlantsRoute,

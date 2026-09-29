@@ -13,6 +13,7 @@ import { useQuery } from '@tanstack/react-query'
 import { api } from "@/lib/api"
 import { cn, dayKeyToDate, formatWeekday, getFirstName } from "@/lib/utils"
 import { getPhotos, photoUrl } from "@/lib/photos"
+import { getOpenTodos } from "@/lib/todos"
 
 export const Route = createFileRoute('/')({
     component: Index,
@@ -134,10 +135,33 @@ function LatestPhotosStrip({ photos }: { photos: LatestPhoto[] }) {
     )
 }
 
+type OpenTodo = Awaited<ReturnType<typeof getOpenTodos>>['todos'][number]
+
+function OpenTodosList({ todos }: { todos: OpenTodo[] }) {
+    if (todos.length === 0) {
+        return <span className="text-sm text-muted-foreground">Alles erledigt.</span>
+    }
+
+    return (
+        <ul className="flex flex-col gap-1 text-sm">
+            {todos.slice(0, 2).map((todo) => (
+                <li key={todo.id} className="flex items-center gap-2">
+                    <span className="text-muted-foreground">•</span>
+                    <span className="truncate" title={todo.title}>
+                        {todo.title}
+                    </span>
+                </li>
+            ))}
+        </ul>
+    )
+}
+
 function Index() {
     const { isPending: totalIsPending, error: totalSpentError, data: totalSpent } = useQuery({ queryKey: ['get-total-spent'], queryFn: getTotalSpent })
     const { isPending: overviewIsPending, error: overviewError, data: overview } = useQuery({ queryKey: ['get-water-overview'], queryFn: getWaterOverview })
     const { isPending: photosIsPending, data: photoData } = useQuery({ queryKey: ['get-photos', null], queryFn: () => getPhotos() })
+    // Same key as the Aufgaben page, so ticking a job off there updates this card.
+    const { isPending: todosIsPending, data: todoData } = useQuery({ queryKey: ['get-open-todos'], queryFn: getOpenTodos })
 
     if (totalSpentError) return 'An error has occurred: ' + totalSpentError.message
     if (overviewError) return 'An error has occurred: ' + overviewError.message
@@ -174,6 +198,24 @@ function Index() {
                     {overview && (
                         <CardFooter className="text-sm text-muted-foreground">
                             {overview.openCount} von {overview.days.length} Tagen offen
+                        </CardFooter>
+                    )}
+                </Card>
+            </div>
+            <div className='mr-2 ml-2'>
+                <Card className="w-full max-w-sm m-auto mt-3">
+                    <CardHeader>
+                        <CardTitle>Aufgaben</CardTitle>
+                        <CardDescription>Was noch zu tun ist:</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {todosIsPending || !todoData ? "Loading..." : <OpenTodosList todos={todoData.todos} />}
+                    </CardContent>
+                    {todoData && (
+                        <CardFooter className="text-sm text-muted-foreground">
+                            <Link to="/aufgaben" className="hover:underline">
+                                {todoData.todos.length} offen
+                            </Link>
                         </CardFooter>
                     )}
                 </Card>
