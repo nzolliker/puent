@@ -16,7 +16,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog'
 import { FieldGroup } from '@/components/ui/field'
-import { dayKeyToDate, getFirstName } from '@/lib/utils'
+import { dayKeyToDate, getFirstName, toLocalDayKey } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { createWaterFormSchema } from '@server/sharedTypes'
 
@@ -54,14 +54,6 @@ type WaterBooking = {
     date: Date
     dayKey: string
     name: string
-}
-
-function toLocalDayKey(value: Date) {
-    const year = value.getFullYear()
-    const month = String(value.getMonth() + 1).padStart(2, '0')
-    const day = String(value.getDate()).padStart(2, '0')
-
-    return `${year}-${month}-${day}`
 }
 
 function formatPickedDate(value: Date) {

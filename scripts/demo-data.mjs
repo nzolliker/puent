@@ -61,14 +61,14 @@ const WATER_HISTORY = [
   ['Leo', '2026-10-05'],
 ]
 
-/** Titles stay short on purpose: the table truncates the column at 150px. */
+/** Titles stay short on purpose: the table truncates the column at 9rem. */
 const EXPENSES = [
-  ['Samen', '48.60', '2026-03-14'],
-  ['Pflanzerde', '23.90', '2026-04-02'],
-  ['Giesskanne', '19.80', '2026-04-19'],
-  ['Kompost', '34.50', '2026-05-08'],
-  ['Himbeeren', '56.00', '2026-06-11'],
-  ['Schneckenzaun', '41.20', '2026-08-23'],
+  ['Samen', '48.60', '2026-03-14', 'Nicola Zolliker'],
+  ['Pflanzerde', '23.90', '2026-04-02', 'Anna Brunner'],
+  ['Giesskanne', '19.80', '2026-04-19', 'Nicola Zolliker'],
+  ['Kompost', '34.50', '2026-05-08', 'Tobias Meier'],
+  ['Himbeeren', '56.00', '2026-06-11', 'Anna Brunner'],
+  ['Schneckenzaun', '41.20', '2026-08-23', 'Tobias Meier'],
 ]
 
 /**
@@ -94,7 +94,10 @@ try {
   console.log(`  waterPlants  ${water.length} rows (${WATER_WINDOW.length} in the dashboard window)`)
 
   await db.query('DELETE FROM `expenses`')
-  await db.query('INSERT INTO `expenses` (`title`, `amount`, `date`) VALUES ?', [EXPENSES])
+  await db.query(
+    'INSERT INTO `expenses` (`title`, `amount`, `date`, `created_by`) VALUES ?',
+    [EXPENSES],
+  )
   const total = EXPENSES.reduce((sum, [, amount]) => sum + Number(amount), 0)
   console.log(`  expenses     ${EXPENSES.length} rows, ${total.toFixed(2)} CHF total`)
 

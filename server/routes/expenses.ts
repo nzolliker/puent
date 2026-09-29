@@ -21,6 +21,9 @@ export const expensesRoutes = new Hono()
     return c.json({ expenses: expenses });
   })
 
+  // `createdBy` arrives in the request body, because there is no login yet.
+  // When one lands, this handler is the only place that changes: drop the
+  // field from the payload and read the name off the session instead.
   .post("/", zValidator("json", createExpenseSchema), async (c) => {
     const expense = c.req.valid("json");
 
