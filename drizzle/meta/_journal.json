@@ -50,6 +50,13 @@
       "when": 1790256608675,
       "tag": "0006_photos_and_albums",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "5",
+      "when": 1790695959760,
+      "tag": "0007_expense_created_by",
+      "breakpoints": true
     }
   ]
 }
