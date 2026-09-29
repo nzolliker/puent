@@ -5,17 +5,35 @@ import { waterPlantsRoutes } from "./routes/waterPlants";
 import { photosRoutes } from "./routes/photos";
 import { albumsRoutes } from "./routes/albums";
 import { todosRoutes } from "./routes/todos";
+import { authRoutes } from "./routes/auth";
+import { loadUser, requireAuth, type AppEnv } from "./lib/auth";
 import { serveStatic } from "hono/bun";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
 import { resolvePhotoPath } from "./lib/photoStorage";
 
-const app = new Hono();
+const app = new Hono<AppEnv>();
 
 app.use(logger());
 
 const api = app.basePath("/api");
+
+// Hono matches in registration order, so both of these have to be registered
+// before the routes below or they never run.
+api.use("*", loadUser);
+
+// Looking is open to anyone who can reach the app; changing anything needs a
+// session. The rule is on the method rather than on each route, so a new POST
+// is protected the day it is written instead of the day someone remembers to
+// guard it. The exemptions are reads and the login routes themselves.
+api.use("*", async (c, next) =>
+  c.req.method === "GET" || c.req.path.startsWith("/api/auth/")
+    ? next()
+    : requireAuth(c, next),
+);
+
+const authApi = api.route("/auth", authRoutes);
 const expensesApi = api.route("/expenses", expensesRoutes);
 const waterPlantsApi = api.route("/water-plants", waterPlantsRoutes);
 const photosApi = api.route("/photos", photosRoutes);
@@ -71,6 +89,7 @@ app.get("*", serveStatic({ path: "./frontend/dist/index.html" }));
 
 export default app;
 export type ApiRoutes =
+  | typeof authApi
   | typeof expensesApi
   | typeof waterPlantsApi
   | typeof photosApi

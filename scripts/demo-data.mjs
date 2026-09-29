@@ -12,6 +12,10 @@
  * This DELETES the rows in waterPlants, expenses, todos and albums, so it refuses
  * to run against anything but a database on localhost. Photos are left alone --
  * their rows point at files in uploads/ that this script cannot invent.
+ *
+ * It also creates the demo accounts below, because writing anything needs a
+ * login now. Existing accounts are updated rather than deleted, so this never
+ * takes a real gardener's password away.
  */
 import 'dotenv/config'
 import mysql from 'mysql2/promise'
@@ -104,9 +108,38 @@ const ALBUMS = [
 /** Describe the sample photos, applied newest first where one is missing. */
 const CAPTIONS = ['Salat und Kabis', 'Kohlrabi', 'Ernte']
 
+/**
+ * The accounts the screenshot and e2e scripts sign in with. The display names
+ * match the `created_by` values above on purpose: the expenses can then be
+ * joined back onto a real account, which is what the login is for.
+ *
+ * The watering rows are deliberately left unattached. They stand in for the
+ * season that predates the login, and they are what keeps the "name kept
+ * alongside user_id" path honest -- the calendar still has to render them.
+ */
+const DEMO_USERS = [
+  ['anna', 'Anna Brunner'],
+  ['nicola', 'Nicola Zolliker'],
+  ['tobias', 'Tobias Meier'],
+]
+
+const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? 'gartenzaun'
+
 const db = await mysql.createConnection(url)
 
 try {
+  // Upsert rather than replace: a local database may also hold an account that
+  // was created by hand, and this script has no business resetting it.
+  const passwordHash = await Bun.password.hash(DEMO_PASSWORD)
+  for (const [username, name] of DEMO_USERS) {
+    await db.query(
+      'INSERT INTO `users` (`username`, `name`, `password_hash`) VALUES (?, ?, ?) ' +
+        'ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `password_hash` = VALUES(`password_hash`)',
+      [username, name, passwordHash],
+    )
+  }
+  console.log(`  users        ${DEMO_USERS.length} demo accounts, password "${DEMO_PASSWORD}"`)
+
   await db.query('DELETE FROM `waterPlants`')
   const water = [...WATER_WINDOW, ...WATER_HISTORY]
   await db.query('INSERT INTO `waterPlants` (`name`, `date`) VALUES ?', [water])
@@ -117,8 +150,12 @@ try {
     'INSERT INTO `expenses` (`title`, `amount`, `date`, `created_by`) VALUES ?',
     [EXPENSES],
   )
+  // What the POST route now does for every new expense, applied to the seed.
+  const [attached] = await db.query(
+    'UPDATE `expenses` e JOIN `users` u ON u.`name` = e.`created_by` SET e.`user_id` = u.`id`',
+  )
   const total = EXPENSES.reduce((sum, [, amount]) => sum + Number(amount), 0)
-  console.log(`  expenses     ${EXPENSES.length} rows, ${total.toFixed(2)} CHF total`)
+  console.log(`  expenses     ${EXPENSES.length} rows, ${total.toFixed(2)} CHF total, ${attached.affectedRows} linked to an account`)
 
   await db.query('DELETE FROM `todos`')
   const todos = [

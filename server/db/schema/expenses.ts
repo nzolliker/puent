@@ -1,4 +1,5 @@
 import {
+  bigint,
   decimal,
   mysqlTable,
   serial,
@@ -8,6 +9,7 @@ import {
 } from "drizzle-orm/mysql-core";
 import { createInsertSchema, createSelectSchema } from "drizzle-zod";
 import { z } from "zod";
+import { users } from "./users";
 
 export const expenses = mysqlTable("expenses", {
   id: serial().primaryKey(),
@@ -16,7 +18,13 @@ export const expenses = mysqlTable("expenses", {
   createdAt: timestamp("created_at").defaultNow(),
   date: date("date").notNull(),
   // Nullable: the rows that predate this column have no name to backfill with.
+  // Kept alongside `userId`, because those same rows have no account either.
   createdBy: text("created_by"),
+  // serial() is `bigint unsigned`, so the foreign key has to match it.
+  userId: bigint("user_id", { mode: "number", unsigned: true }).references(
+    () => users.id,
+    { onDelete: "set null" },
+  ),
 });
 
 export const insertExpenseSchema = createInsertSchema(expenses, {

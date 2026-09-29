@@ -9,6 +9,7 @@ import {
 
 import { createWaterSchema, waterOverviewQuerySchema } from "../sharedTypes";
 import { and, desc, gte, lte } from "drizzle-orm";
+import type { AppEnv } from "../lib/auth";
 
 // helper functions
 function toDayKey(value: string | Date) {
@@ -53,7 +54,7 @@ const fakeWaterPlants: waterPlants[] = [
 ];
 */
 
-export const waterPlantsRoutes = new Hono()
+export const waterPlantsRoutes = new Hono<AppEnv>()
   .get("/", async (c) => {
     const result = await db
       .select()
@@ -62,11 +63,16 @@ export const waterPlantsRoutes = new Hono()
 
     return c.json({ waterPlants: result });
   })
+  // The name comes off the session, the same rule the expenses route follows.
   .post("/", zValidator("json", createWaterSchema), async (c) => {
     const waterDate = c.req.valid("json");
+    // Non-null: the mutation guard in app.ts has already run.
+    const user = c.get("user")!;
 
     const validatedwaterDate = insertWaterDateSchema.parse({
       ...waterDate,
+      name: user.name,
+      userId: user.id,
     });
 
     const result = await db

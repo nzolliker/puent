@@ -9,6 +9,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "demo-data": "bun scripts/demo-data.mjs",
+    "create-user": "bun scripts/create-user.mjs",
     "screenshots": "bun scripts/screenshots.mjs",
     "test:e2e": "bun e2e/upload.mjs"
   },

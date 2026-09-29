@@ -70,6 +70,18 @@ change instead of quietly going stale.
 </tr>
 </table>
 
+**Accounts**
+- Anyone who can reach the app can read everything: the rota, the expenses, the
+  to-dos and the photos. Changing any of it needs a login.
+- Signing up for a day or adding an expense no longer asks who you are — the
+  name comes off the session, so a row belongs to an account rather than to
+  whatever was typed in the box.
+- There is no registration form. `bun run create-user` prints a single-use link
+  that the person opens to choose their own password; the same command issues a
+  new one when somebody forgets theirs.
+
+<img src="docs/screenshots/09-nur-lesen.webp" alt="The tasks page seen without logging in: the list is readable, the buttons are disabled" width="300">
+
 **Fotos**
 - Upload several pictures at once, by file picker or drag and drop.
 - Optional albums ("Beet 1", "Ernte"), a caption and the date the picture was
@@ -84,8 +96,11 @@ change instead of quietly going stale.
 
 The honest list, because most of it is visible in the screenshots above:
 
-- **No login.** Anyone who can reach the app can sign up for a day or add an
-  expense. That is fine on a home network and is the first thing on the roadmap.
+- **No HTTPS.** The Pi serves plain HTTP on the LAN, so the session cookie
+  cannot carry `Secure` — anything on the same network can read it off the wire.
+  Fine for a home network of people I know, and the reason the app does not
+  leave it. `COOKIE_SECURE=true` is already wired up for the day a reverse proxy
+  terminates TLS in front of it.
 - **The UI language is inconsistent.** The nav and most screens are German, but
   the expenses table is still English, one button says "Submit", and the calendar
   header shows English weekday abbreviations. That screen is the oldest code in
@@ -127,6 +142,7 @@ request on the server and the form in the browser.
 | ORM | Drizzle | `server/db/index.ts`, schemas in `server/db/schema/` |
 | Migrations | drizzle-kit | `drizzle.config.ts`, SQL in `drizzle/` |
 | Validation | Zod + drizzle-zod | `server/sharedTypes.ts` |
+| Auth | own session cookies + `Bun.password` (argon2id) | `server/lib/auth.ts` |
 | UI | React 19 + Vite 7 | `frontend/` |
 | Routing | TanStack Router (file-based) | `frontend/src/routes/` |
 | Data / forms | TanStack Query + TanStack Form | per-route query helpers |
@@ -175,8 +191,10 @@ production, recovery — is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 - **Plant & harvest logs** — what went into which bed and when, and what came
   back out. The part that makes the app useful next year, not just this week.
-- **Users & login** — real accounts instead of typing your name into a field, so
-  entries belong to someone and the app can leave the home network.
+- **HTTPS** — a reverse proxy in front of the Pi, so the session cookie can be
+  `Secure` and the app could leave the home network.
+- **Per-person expense split** — who owes whom, now that an expense belongs to
+  an account rather than to a typed-in name.
 
 ## Running it locally
 
@@ -211,6 +229,18 @@ that:
 bun run demo-data    # watering rota, expenses and albums; refuses a non-local DB
 ```
 
+That also creates three demo accounts — `anna`, `nicola` and `tobias`, all with
+the password `gartenzaun` — because nothing can be entered without logging in.
+The e2e test and the screenshot script sign in as `anna`.
+
+For a real account, skip the seed and issue a setup link instead:
+
+```bash
+bun run create-user nicola "Nicola"
+# prints http://localhost:3000/setup?token=... -- open it and pick a password
+bun run create-user nicola --reset    # same thing when somebody forgets
+```
+
 Run the two halves in two terminals:
 
 ```bash
@@ -232,8 +262,17 @@ images in this README (it needs the app running).
 <details>
 <summary>API endpoints</summary>
 
+Every `GET` is public. Everything that writes needs a session cookie and
+answers `401` without one — the rule lives in one place, `server/app.ts`, and is
+keyed on the method rather than on each route.
+
 | Method | Path | Purpose |
 | --- | --- | --- |
+| `GET` | `/api/auth/me` | the signed-in user, or `null` — never a 401 |
+| `POST` | `/api/auth/login` | username and password, sets the session cookie |
+| `POST` | `/api/auth/logout` | drops the session |
+| `POST` | `/api/auth/setup/check` | is this setup link still good, and whose is it |
+| `POST` | `/api/auth/setup` | choose a password, consumes the link, signs in |
 | `GET` | `/api/water-plants` | all watering entries, newest date first |
 | `POST` | `/api/water-plants` | sign up for a day |
 | `GET` | `/api/water-plants/next-free-date` | first unclaimed day, and how far away it is |

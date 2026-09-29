@@ -7,24 +7,32 @@ import {
 import { insertTodoSchema, selectTodoSchema } from "./db/schema/todos";
 
 // expenses
+// `createdBy` and `userId` are not in the payload: the server reads both off
+// the session, so the browser cannot claim to be someone else.
 export const createExpenseSchema = insertExpenseSchema.omit({
   id: true,
   createdAt: true,
+  createdBy: true,
+  userId: true,
 });
 
 export const createExpenseFormSchema = selectExpenseSchema.omit({
   id: true,
   createdAt: true,
+  createdBy: true,
+  userId: true,
 });
 
 // watering
+// Same rule as the expenses payload: the name comes from the session.
 export const createWaterSchema = insertWaterDateSchema.omit({
   id: true,
   createdAt: true,
+  name: true,
+  userId: true,
 });
 
 export const createWaterFormSchema = z.object({
-  name: z.string().min(1),
   date: z.date().nullable(),
 }).refine((value) => value.date !== null, {
   path: ["date"],
@@ -76,3 +84,30 @@ export const createTodoFormSchema = selectTodoSchema.omit({
 export const setTodoDoneSchema = z.object({
   done: z.boolean(),
 });
+
+// auth
+export const loginSchema = z.object({
+  username: z.string().min(1, { message: "Benutzername erforderlich" }),
+  password: z.string().min(1, { message: "Passwort erforderlich" }),
+});
+
+export const setupTokenSchema = z.object({
+  token: z.string().min(1),
+});
+
+export const setPasswordSchema = z.object({
+  token: z.string().min(1),
+  password: z.string().min(8, { message: "Mindestens 8 Zeichen" }),
+});
+
+// The confirmation field never leaves the browser, so it lives in the form
+// schema rather than the one the route validates.
+export const setPasswordFormSchema = z
+  .object({
+    password: z.string().min(8, { message: "Mindestens 8 Zeichen" }),
+    confirmation: z.string(),
+  })
+  .refine((value) => value.password === value.confirmation, {
+    path: ["confirmation"],
+    message: "Passwörter stimmen nicht überein",
+  });

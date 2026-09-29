@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useCanEdit } from '@/lib/auth'
 
 import {
     Card,
@@ -54,6 +55,10 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
         isPast && 'opacity-60',
     )
 
+    // A visitor sees the open day, but the chip does not promise a signup it
+    // cannot deliver -- it only links onwards for a member.
+    const canEdit = useCanEdit()
+
     const chipContent = day.isOpen ? (
         <span>—</span>
     ) : names.length > 0 ? (
@@ -78,7 +83,7 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
                 <div>{date.getDate()}.</div>
             </div>
             <div className={cn('w-full rounded-md', day.isToday && 'ring-2 ring-primary')}>
-                {day.isOpen ? (
+                {day.isOpen && canEdit ? (
                     <Link
                         to="/waterPlants"
                         search={{ date: day.date }}
@@ -88,7 +93,12 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
                         {chipContent}
                     </Link>
                 ) : (
-                    <span className={chipClasses}>{chipContent}</span>
+                    <span
+                        className={chipClasses}
+                        title={day.isOpen ? 'Noch offen' : undefined}
+                    >
+                        {chipContent}
+                    </span>
                 )}
             </div>
         </div>

@@ -9,8 +9,9 @@ import {
 
 import { createExpenseSchema } from "../sharedTypes";
 import { desc, sum, eq } from "drizzle-orm";
+import type { AppEnv } from "../lib/auth";
 
-export const expensesRoutes = new Hono()
+export const expensesRoutes = new Hono<AppEnv>()
 
   .get("/", async (c) => {
     const expenses = await db
@@ -21,14 +22,17 @@ export const expensesRoutes = new Hono()
     return c.json({ expenses: expenses });
   })
 
-  // `createdBy` arrives in the request body, because there is no login yet.
-  // When one lands, this handler is the only place that changes: drop the
-  // field from the payload and read the name off the session instead.
+  // Who paid is read off the session, never off the request body, so the
+  // browser cannot enter an expense in somebody else's name.
   .post("/", zValidator("json", createExpenseSchema), async (c) => {
     const expense = c.req.valid("json");
+    // Non-null: the mutation guard in app.ts has already run.
+    const user = c.get("user")!;
 
     const validatedExpense = insertExpenseSchema.parse({
       ...expense,
+      createdBy: user.name,
+      userId: user.id,
     });
 
     const result = await db

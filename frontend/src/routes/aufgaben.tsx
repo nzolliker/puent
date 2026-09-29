@@ -6,6 +6,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Check, Circle, History, Plus, Trash2, Undo2 } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { MemberOnly, ReadOnlyNotice } from '@/components/access'
+import { useCanEdit } from '@/lib/auth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
@@ -223,16 +225,18 @@ function VerlaufDialog({
                                     <span className="text-xs text-muted-foreground tabular-nums">
                                         {todo.completedAt ? formatDate(todo.completedAt) : ''}
                                     </span>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon-xs"
-                                        type="button"
-                                        aria-label={`${todo.title} wieder öffnen`}
-                                        disabled={undoMutation.isPending}
-                                        onClick={() => undoMutation.mutate(todo.id)}
-                                    >
-                                        <Undo2 />
-                                    </Button>
+                                    <MemberOnly>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon-xs"
+                                            type="button"
+                                            aria-label={`${todo.title} wieder öffnen`}
+                                            disabled={undoMutation.isPending}
+                                            onClick={() => undoMutation.mutate(todo.id)}
+                                        >
+                                            <Undo2 />
+                                        </Button>
+                                    </MemberOnly>
                                 </li>
                             ))}
                         </ul>
@@ -253,6 +257,7 @@ function VerlaufDialog({
 }
 
 function Aufgaben() {
+    const canEdit = useCanEdit()
     const [newOpen, setNewOpen] = useState(false)
     const [verlaufOpen, setVerlaufOpen] = useState(false)
     const invalidateTodos = useInvalidateTodos()
@@ -290,12 +295,18 @@ function Aufgaben() {
                         <History />
                         Verlauf
                     </Button>
-                    <Button type="button" size="sm" onClick={() => setNewOpen(true)}>
+                    <Button
+                        type="button"
+                        size="sm"
+                        disabled={!canEdit}
+                        onClick={() => setNewOpen(true)}
+                    >
                         <Plus />
                         Neue Aufgabe
                     </Button>
                 </div>
             </div>
+            <ReadOnlyNotice className="mt-1" />
 
             <div className="mt-3 rounded-lg border">
                 {isPending ? (
@@ -319,7 +330,7 @@ function Aufgaben() {
                                     type="button"
                                     className="group shrink-0"
                                     aria-label={`${todo.title} erledigen`}
-                                    disabled={busy}
+                                    disabled={busy || !canEdit}
                                     onClick={() => completeMutation.mutate(todo.id)}
                                 >
                                     <Circle className="text-muted-foreground group-hover:hidden" />
@@ -328,17 +339,19 @@ function Aufgaben() {
                                 <span className="flex-1 truncate text-sm" title={todo.title}>
                                     {todo.title}
                                 </span>
-                                <Button
-                                    variant="ghost"
-                                    size="icon-xs"
-                                    type="button"
-                                    className="shrink-0"
-                                    aria-label={`${todo.title} löschen`}
-                                    disabled={busy}
-                                    onClick={() => deleteMutation.mutate(todo.id)}
-                                >
-                                    <Trash2 />
-                                </Button>
+                                <MemberOnly>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon-xs"
+                                        type="button"
+                                        className="shrink-0"
+                                        aria-label={`${todo.title} löschen`}
+                                        disabled={busy}
+                                        onClick={() => deleteMutation.mutate(todo.id)}
+                                    >
+                                        <Trash2 />
+                                    </Button>
+                                </MemberOnly>
                             </li>
                         ))}
                     </ul>

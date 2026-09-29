@@ -8,6 +8,9 @@
  *   bun run test:e2e            # needs the app running (bun run dev + vite)
  *   BASE=http://localhost:3000 bun run test:e2e   # against the built frontend
  *
+ * Uploading and deleting are members-only, so this signs in first. The account
+ * is one of the demo ones -- run `bun run demo-data` if the login fails.
+ *
  * WebKit stands in for Safari, which is what the garden group uses.
  */
 import { webkit, chromium } from 'playwright'
@@ -17,8 +20,45 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 const BASE = process.env.BASE ?? 'http://localhost:5173'
+const USER = process.env.E2E_USER ?? 'anna'
+const PASSWORD = process.env.E2E_PASSWORD ?? 'gartenzaun'
 const dir = mkdtempSync(join(tmpdir(), 'puent-e2e-'))
 let failures = 0
+
+/** The session cookie for the plain `fetch` calls in cleanup(). */
+let apiCookie = ''
+
+/** The cookie itself, added to each browser context before it navigates. */
+let sessionCookie = null
+
+/**
+ * Signs in over plain fetch rather than playwright's request API: that one
+ * parses the response URL with `new URL()` and under Bun it is handed a
+ * relative path, which throws.
+ */
+async function loginForApi() {
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: USER, password: PASSWORD }),
+  })
+  if (!res.ok) {
+    throw new Error(
+      `Login als "${USER}" fehlgeschlagen (${res.status}). bun run demo-data?`,
+    )
+  }
+  apiCookie = res.headers
+    .getSetCookie()
+    .map((cookie) => cookie.split(';')[0])
+    .join('; ')
+
+  const [name, value] = apiCookie.split('=')
+  sessionCookie = { name, value, url: BASE }
+}
+
+async function login(page) {
+  await page.context().addCookies([sessionCookie])
+}
 
 /**
  * Every id this run uploaded, removed again at the end.
@@ -81,6 +121,7 @@ async function uploadMany(file, copies = 6) {
       bodies.push(collect(r))
     }
   })
+  await login(page)
   await page.goto(`${BASE}/fotos`, { waitUntil: 'networkidle' })
   const before = await page.locator('img[src^="/uploads"]').count()
   await page.getByRole('button', { name: /Hochladen/ }).first().click()
@@ -107,6 +148,7 @@ async function upload(browserType, name, file, expectUpload) {
     }
   })
 
+  await login(page)
   await page.goto(`${BASE}/fotos`, { waitUntil: 'networkidle' })
   const before = await page.locator('img[src^="/uploads"]').count()
 
@@ -152,7 +194,10 @@ async function cleanup() {
 
   let removed = 0
   for (const id of uploaded) {
-    const res = await fetch(`${BASE}/api/photos/${id}`, { method: 'DELETE' })
+    const res = await fetch(`${BASE}/api/photos/${id}`, {
+      method: 'DELETE',
+      headers: { cookie: apiCookie },
+    })
     if (res.ok) removed++
   }
 
@@ -165,6 +210,8 @@ async function cleanup() {
 
 const { jpeg, heic } = fixtures()
 console.log(`\nZiel: ${BASE}\n`)
+
+await loginForApi()
 
 try {
   console.log('WebKit (Safari)')

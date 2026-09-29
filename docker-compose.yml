@@ -31,6 +31,11 @@ services:
       NODE_ENV: ${NODE_ENV}
       PORT: ${PORT}
       UPLOAD_DIR: ${UPLOAD_DIR}
+      # Only the setup links `bun run create-user` prints are built from this.
+      APP_URL: ${APP_URL}
+      # Leave false while the Pi serves plain HTTP: a Secure cookie would never
+      # be sent, and nobody could stay logged in. Flip it once TLS is in front.
+      COOKIE_SECURE: ${COOKIE_SECURE}
     volumes:
       # Uploaded photos. Without this they live in the container's writable
       # layer and every rebuild deletes them.
