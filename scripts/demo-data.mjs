@@ -9,8 +9,8 @@
  *
  *   bun run demo-data
  *
- * This DELETES the rows in waterPlants, expenses and albums, so it refuses to
- * run against anything but a database on localhost. Photos are left alone --
+ * This DELETES the rows in waterPlants, expenses, todos and albums, so it refuses
+ * to run against anything but a database on localhost. Photos are left alone --
  * their rows point at files in uploads/ that this script cannot invent.
  */
 import 'dotenv/config'
@@ -72,6 +72,25 @@ const EXPENSES = [
 ]
 
 /**
+ * The jobs that are not watering. A few left open so the page and the
+ * dashboard card have something to show, and a few already done so the
+ * Verlauf dialog is not an empty state in the screenshot.
+ */
+const TODOS_OPEN = [
+  'Unkraut jäten Beet 2',
+  'Zaun beim Kompost flicken',
+  'Schneckenkörner nachfüllen',
+  'Tomaten aufbinden',
+]
+
+/** Completed, newest last -- the history sorts on `completed_at` descending. */
+const TODOS_DONE = [
+  ['Laub vom Weg räumen', '2026-09-06 10:20:00'],
+  ['Beet 1 mulchen', '2026-09-13 16:45:00'],
+  ['Giesskanne ersetzen', '2026-09-21 09:05:00'],
+]
+
+/**
  * Albums are filled from whatever photos are in the database, newest first,
  * rather than matched on a caption -- captions change, and a seed that
  * silently assigns nothing is worse than no seed at all. Anything left over
@@ -100,6 +119,14 @@ try {
   )
   const total = EXPENSES.reduce((sum, [, amount]) => sum + Number(amount), 0)
   console.log(`  expenses     ${EXPENSES.length} rows, ${total.toFixed(2)} CHF total`)
+
+  await db.query('DELETE FROM `todos`')
+  const todos = [
+    ...TODOS_OPEN.map((title) => [title, null]),
+    ...TODOS_DONE,
+  ]
+  await db.query('INSERT INTO `todos` (`title`, `completed_at`) VALUES ?', [todos])
+  console.log(`  todos        ${todos.length} rows (${TODOS_OPEN.length} still open)`)
 
   // Photos outlive albums: the FK is ON DELETE SET NULL, so clearing the
   // albums table detaches the photos instead of deleting them.
