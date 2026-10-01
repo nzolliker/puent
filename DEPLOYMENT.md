@@ -160,6 +160,7 @@ It contains values such as:
 - `MYSQL_ROOT_PASSWORD`
 - `DATABASE_URL`
 - `UPLOAD_DIR=/app/uploads`
+- `RAIN_THRESHOLD_MM=2` (optional)
 - `APP_URL=http://<pi-host>:3000`
 - `COOKIE_SECURE=false`
 
@@ -176,6 +177,21 @@ so it has to be an address the garden group's phones can actually open.
 cookie is never sent over HTTP, so setting it to `true` today would mean nobody
 could stay logged in. Set it to `true` on the day a reverse proxy terminates TLS
 in front of the app.
+
+`RAIN_THRESHOLD_MM` is how many millimetres of rain make a day count as a rain
+day in the Giess-Plan. It can be left out — `docker-compose.yml` falls back to
+`2` — but do not set it to an empty value, which would count every day as rainy.
+
+### Outbound network
+
+The app fetches rainfall for Winterthur from MeteoSchweiz open data
+(`data.geo.admin.ch`) and caches it in the `weatherDays` table. At most two
+requests an hour, a few hundred kilobytes each.
+
+It is the only outbound call the app makes, and it is not load-bearing: if
+`data.geo.admin.ch` cannot be reached, the Giess-Plan and the dashboard serve
+the rain data already in the table, or none at all, and keep working. A failed
+refresh logs one line and is not retried for five minutes.
 
 ### `drizzle.config.ts`
 

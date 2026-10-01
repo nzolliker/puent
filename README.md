@@ -25,8 +25,8 @@ garden, so that is the size everything is designed at.
 
 <table>
 <tr>
-<td width="50%"><img src="docs/screenshots/01-dashboard.webp" alt="Dashboard showing the four newest photos, the watering week around today, and the total spent"><br><sub><b>Dashboard</b> — the week around today, who signed up, and the running total.</sub></td>
-<td width="50%"><img src="docs/screenshots/02-giess-plan.webp" alt="Month calendar with booked watering days in green, each carrying a name"><br><sub><b>Giess-Plan</b> — booked days are green, struck through, and carry the name of whoever took them.</sub></td>
+<td width="50%"><img src="docs/screenshots/01-dashboard.webp" alt="Dashboard showing the four newest photos, the watering week around today with a rainy day marked blue, and the total spent"><br><sub><b>Dashboard</b> — the week around today, who signed up, what the rain is doing, and the running total.</sub></td>
+<td width="50%"><img src="docs/screenshots/02-giess-plan.webp" alt="Month calendar with booked watering days in green carrying a name, rain days in blue marked Regen, and a booked rain day split diagonally between the two"><br><sub><b>Giess-Plan</b> — booked days are green and carry a name; rain days are blue. A day that is both is split diagonally.</sub></td>
 </tr>
 <tr>
 <td width="50%"><img src="docs/screenshots/04-fotos.webp" alt="Photo gallery with album filter chips and a grid of thumbnails"><br><sub><b>Fotos</b> — the album filter lives in the URL, so a filtered view can be shared.</sub></td>
@@ -45,6 +45,14 @@ change instead of quietly going stale.
 - Clicking an open day jumps to the calendar with that date preselected and the
   signup dialog already open.
 - Signing up is a name and a date — one row in the `waterPlants` table.
+- **Rain is on the calendar.** A day it rained is blue and shows how much —
+  `4.9 mm` — where a name would go; if somebody had already signed up, the day
+  keeps their name and is split diagonally, green over blue. Today and the next
+  seven days come from the forecast instead, in a lighter blue.
+- How much rain counts is a number you can change: `RAIN_THRESHOLD_MM` sets the
+  default, and the slider under the calendar overrides it for the current view.
+  The threshold lives in the URL, so a view can be shared — and it is applied in
+  the browser, so moving the slider recolours the calendar without a round trip.
 
 <img src="docs/screenshots/03-giessen-eintragen.webp" alt="Signup dialog opened from a dashboard deep link, preselected to 26.09.2026" width="300">
 
@@ -132,6 +140,28 @@ into a type error in the components that use it, not a 404 at runtime. The Zod
 schemas in `server/sharedTypes.ts` travel the same way and validate both the
 request on the server and the form in the browser.
 
+### Where the weather comes from
+
+Rainfall is [MeteoSchweiz open data](https://opendatadocs.meteoswiss.ch), which
+needs no API key. Two datasets, because neither covers the whole calendar:
+
+| Window | Dataset | Detail |
+| --- | --- | --- |
+| up to yesterday | automatic precipitation stations | station `WIN`, *Winterthur / Seen* |
+| today + 7 days | local forecasts | point `10878`, *Winterthur / Veltheim* |
+
+`server/lib/weather.ts` fetches both, keeps the daily totals in the
+`weatherDays` table and refreshes them at most once an hour. It is the only
+outbound request the app makes, and nothing depends on it: if
+`data.geo.admin.ch` is unreachable the pages serve whatever is already cached,
+or no rain at all, and carry on. Measurements run 0–0 UTC and forecasts 0–24
+local, so a measured day is an hour or two out of step with the calendar day —
+close enough to answer "did it rain", which is the question being asked.
+
+Two limits worth knowing: the station's daily file only goes back to 1 January
+of the current year, so nothing before that is coloured, and the forecast is
+cut at seven days, one short of the eight it reaches.
+
 ### Stack
 
 | Layer | Choice | Where |
@@ -148,6 +178,7 @@ request on the server and the form in the browser.
 | Data / forms | TanStack Query + TanStack Form | per-route query helpers |
 | Styling | Tailwind v4 + shadcn/Radix primitives | `frontend/src/components/ui/` |
 | Images | sharp (resize + WebP) | `server/lib/photoStorage.ts` |
+| Weather | MeteoSchweiz open data | `server/lib/weather.ts` |
 | Deployment | Docker Compose on a Raspberry Pi | [`DEPLOYMENT.md`](DEPLOYMENT.md) |
 
 ## Testing
@@ -222,6 +253,10 @@ echo 'DATABASE_URL=mysql://root:dev@localhost:3306/puent' > .env
 bun run db:migrate
 ```
 
+`RAIN_THRESHOLD_MM` can go in the same file to change how much rain makes a day
+count as a rain day; it defaults to `2`. Nothing else is needed for the weather
+— the MeteoSchweiz data is open and takes no key.
+
 A fresh database leaves every screen on its empty state, so there is a seed for
 that:
 
@@ -277,6 +312,7 @@ keyed on the method rather than on each route.
 | `POST` | `/api/water-plants` | sign up for a day |
 | `GET` | `/api/water-plants/next-free-date` | first unclaimed day, and how far away it is |
 | `GET` | `/api/water-plants/overview?days=3` | day-by-day window around today |
+| `GET` | `/api/water-plants/rain` | every day it rained: measured for the past, forecast for the next seven |
 | `GET` | `/api/expenses` | all expenses |
 | `POST` | `/api/expenses` | add an expense |
 | `GET` | `/api/expenses/total-spent` | sum of all amounts |

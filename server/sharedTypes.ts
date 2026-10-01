@@ -39,8 +39,14 @@ export const createWaterFormSchema = z.object({
   message: "Bitte ein Datum auswählen",
 });
 
+// How much rain makes a day a rain day. Absent means "whatever the server's
+// RAIN_THRESHOLD_MM says", so the Giess-Plan can override it per request
+// without the default having to travel in the URL.
+const rainThresholdParam = z.coerce.number().min(0).max(100).optional();
+
 export const waterOverviewQuerySchema = z.object({
   days: z.coerce.number().int().min(0).max(14).default(3),
+  thresholdMm: rainThresholdParam,
 });
 
 // photos

@@ -44,12 +44,19 @@ const shots = [
   {
     file: '02-giess-plan.webp',
     path: '/waterPlants',
-    ready: (page) => page.getByRole('heading', { name: 'Giess-Plan' }).waitFor(),
+    // The legend, not the heading: it only renders once the rain query has
+    // answered, so this cannot capture the calendar before it is coloured.
+    ready: (page) => page.locator('[data-slot="slider"]').waitFor(),
   },
   {
     file: '03-giessen-eintragen.webp',
     path: `/waterPlants?date=${OPEN_DAY}`,
-    ready: (page) => page.getByRole('dialog').waitFor(),
+    // Same reason as above, plus the dialog: the calendar behind the sheet is
+    // part of the shot.
+    ready: async (page) => {
+      await page.locator('[data-slot="slider"]').waitFor()
+      await page.getByRole('dialog').waitFor()
+    },
     // The overlay is fixed and 100dvh tall, so measuring the page would just
     // return the viewport. Crop to the sheet, keeping the calendar behind it.
     cropTo: '[role=dialog]',
