@@ -548,29 +548,25 @@ Use `git status` first so you know whether the production checkout is clean befo
 docker compose --env-file .env.production build app
 ```
 
-### 5. Restart the app with the new image
-
-If only app code changed and MySQL config did not change:
+### 5. Run migrations with the new image
 
 ```bash
-docker compose --env-file .env.production up -d app
+docker compose --env-file .env.production run --rm -T app bunx drizzle-kit migrate
 ```
 
-If you want the whole stack refreshed:
+This starts a one-off container from the image built in step 4, next to the
+version that is still serving. With no new migrations it does nothing, so it is
+safe to run every time. If it fails, stop here: the old version is untouched.
+
+### 6. Switch over to the new image
 
 ```bash
 docker compose --env-file .env.production up -d
 ```
 
-If Compose says the app needs recreation, that is expected.
-
-### 6. Run migrations if the new version includes schema changes
-
-```bash
-docker exec -it puent-app bunx drizzle-kit migrate
-```
-
-This step matters whenever the new app version depends on new or changed tables/columns.
+The whole stack rather than only `app`, so a change to `docker-compose.yml` is
+picked up as well. Services that did not change are left alone. If Compose says
+the app needs recreation, that is expected.
 
 ### 7. Verify the deployment
 
