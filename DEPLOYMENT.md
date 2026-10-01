@@ -394,12 +394,17 @@ docker exec -it puent-app bun run create-user nicola "Nicola"
 It prints a `$APP_URL/setup?token=...` link. Send it over the group chat — it
 is valid for seven days and stops working the moment it is used.
 
-The same command resets a forgotten password, which also signs that account out
-everywhere:
+The same command resets a forgotten password:
 
 ```bash
 docker exec -it puent-app bun run create-user nicola --reset
 ```
+
+Resetting drops that account's existing sessions, but only once the person
+opens the link and sets a new password. Until then the old session stays live.
+That is fine for a forgotten password; if you are resetting because somebody
+else may have the old one, delete that account's rows from `sessions` as well
+rather than waiting.
 
 There is no mail server anywhere in this setup, so the link is the whole
 delivery mechanism.
@@ -614,7 +619,7 @@ Critical:
 This runbook assumes:
 
 - the app is exposed on port `3000`
-- MySQL is exposed on port `3306`
+- MySQL is published on `127.0.0.1:3306`, reachable on the Pi but not from the LAN
 - the Bun server serves static files from `frontend/dist`
 - the API lives under `/api`
 - Drizzle migrations are in `drizzle/`

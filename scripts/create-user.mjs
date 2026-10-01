@@ -7,8 +7,12 @@
  *
  * There is no e-mail server anywhere in this project, so the link is the whole
  * delivery mechanism: copy it into the group chat. It is valid for seven days
- * and stops working the moment it is used. A reset also drops that account's
- * existing sessions, so whoever knew the old password is logged out.
+ * and stops working the moment it is used.
+ *
+ * A reset drops that account's existing sessions -- but only when the link is
+ * opened and a new password set, not when this command runs. Until then the
+ * old session stays live, so if you are resetting because somebody else may
+ * have the password, clear that account's `sessions` rows yourself too.
  *
  * Unlike demo-data, this is meant to run against production too -- on the Pi
  * that is `docker exec -it puent-app bun run create-user ...`.

@@ -15,7 +15,11 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     ports:
-      - "3306:3306"
+      # Loopback, not 0.0.0.0: the app talks to MySQL over the Compose network
+      # and never uses this mapping. It is here so `mysql -u ...` and a dump
+      # work when you are on the Pi, and binding it wide would put the database
+      # on the LAN next to an app that already serves plain HTTP.
+      - "127.0.0.1:3306:3306"
 
   app:
     image: puent-app:latest
