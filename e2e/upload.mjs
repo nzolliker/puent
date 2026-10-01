@@ -8,8 +8,9 @@
  *   bun run test:e2e            # needs the app running (bun run dev + vite)
  *   BASE=http://localhost:3000 bun run test:e2e   # against the built frontend
  *
- * Uploading and deleting are members-only, so this signs in first. The account
- * is one of the demo ones -- run `bun run demo-data` if the login fails.
+ * Uploading and deleting are members-only. Locally nobody signs in: the server
+ * runs with AUTH_DEV_BYPASS=true and takes the address from `x-dev-email`. The
+ * one used here is a demo account -- run `bun run demo-data` if uploads 401.
  *
  * WebKit stands in for Safari, which is what the garden group uses.
  */
@@ -20,44 +21,31 @@ import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
 
 const BASE = process.env.BASE ?? 'http://localhost:5173'
-const USER = process.env.E2E_USER ?? 'anna'
-const PASSWORD = process.env.E2E_PASSWORD ?? 'gartenzaun'
+const EMAIL = process.env.E2E_EMAIL ?? 'anna@example.com'
 const dir = mkdtempSync(join(tmpdir(), 'puent-e2e-'))
 let failures = 0
 
-/** The session cookie for the plain `fetch` calls in cleanup(). */
-let apiCookie = ''
-
-/** The cookie itself, added to each browser context before it navigates. */
-let sessionCookie = null
-
-/**
- * Signs in over plain fetch rather than playwright's request API: that one
- * parses the response URL with `new URL()` and under Bun it is handed a
- * relative path, which throws.
- */
-async function loginForApi() {
-  const res = await fetch(`${BASE}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: USER, password: PASSWORD }),
-  })
-  if (!res.ok) {
-    throw new Error(
-      `Login als "${USER}" fehlgeschlagen (${res.status}). bun run demo-data?`,
-    )
-  }
-  apiCookie = res.headers
-    .getSetCookie()
-    .map((cookie) => cookie.split(';')[0])
-    .join('; ')
-
-  const [name, value] = apiCookie.split('=')
-  sessionCookie = { name, value, url: BASE }
+/** Makes every request this page sends a member's. */
+async function login(page) {
+  await page.setExtraHTTPHeaders({ 'x-dev-email': EMAIL })
 }
 
-async function login(page) {
-  await page.context().addCookies([sessionCookie])
+/**
+ * Fails early and says why, instead of five uploads each reporting a 401. Over
+ * plain fetch rather than playwright's request API: that one parses the
+ * response URL with `new URL()` and under Bun it is handed a relative path,
+ * which throws.
+ */
+async function assertMember() {
+  const res = await fetch(`${BASE}/api/auth/me`, {
+    headers: { 'x-dev-email': EMAIL },
+  })
+  const { user } = res.ok ? await res.json() : {}
+  if (!user) {
+    throw new Error(
+      `"${EMAIL}" ist kein Mitglied (${res.status}). bun run demo-data? AUTH_DEV_BYPASS=true?`,
+    )
+  }
 }
 
 /**
@@ -196,7 +184,9 @@ async function cleanup() {
   for (const id of uploaded) {
     const res = await fetch(`${BASE}/api/photos/${id}`, {
       method: 'DELETE',
-      headers: { cookie: apiCookie },
+      // The second header is what a browser sends by itself. This is not one,
+      // and without it the server's CSRF check turns a body-less DELETE away.
+      headers: { 'x-dev-email': EMAIL, 'sec-fetch-site': 'same-origin' },
     })
     if (res.ok) removed++
   }
@@ -211,7 +201,7 @@ async function cleanup() {
 const { jpeg, heic } = fixtures()
 console.log(`\nZiel: ${BASE}\n`)
 
-await loginForApi()
+await assertMember()
 
 try {
   console.log('WebKit (Safari)')

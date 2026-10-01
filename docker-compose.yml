@@ -39,12 +39,12 @@ services:
       # default is here as well as in the code, because an unset variable
       # interpolates to "" and an empty threshold would mark every day rainy.
       RAIN_THRESHOLD_MM: ${RAIN_THRESHOLD_MM:-2}
-      # Only the setup links `bun run create-user` prints are built from this.
-      APP_URL: ${APP_URL}
-      # true, because the browser only ever reaches the app over the HTTPS that
-      # Cloudflare terminates. Over plain HTTP a Secure cookie is never sent,
-      # so set it to false if you run this stack without the tunnel.
-      COOKIE_SECURE: ${COOKIE_SECURE}
+      # What every request's Cloudflare Access token is checked against: signed
+      # by this team, issued for this application. The server refuses to start
+      # without both, so a line missing from .env.production stops the app
+      # instead of opening it.
+      CF_ACCESS_TEAM_DOMAIN: ${CF_ACCESS_TEAM_DOMAIN}
+      CF_ACCESS_AUD: ${CF_ACCESS_AUD}
     volumes:
       # Uploaded photos. Without this they live in the container's writable
       # layer and every rebuild deletes them.
@@ -54,8 +54,9 @@ services:
     ports:
       # Loopback for the same reason as MySQL: cloudflared reaches the app over
       # the Compose network as http://app:3000 and never uses this mapping. It
-      # is here so `curl localhost:3000` works on the Pi. Binding it wide would
-      # let anything on the LAN walk around Cloudflare Access.
+      # is here so `curl localhost:3000` can tell whether the server is up. The
+      # app refuses any request without an Access token, so binding it wide
+      # would offer the LAN a port that only ever answers 403.
       - "127.0.0.1:3000:3000"
 
   # The only way in from outside. It dials out to Cloudflare, so no port is

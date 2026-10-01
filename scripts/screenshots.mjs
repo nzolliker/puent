@@ -9,10 +9,12 @@
  *   bun run dev            # serves frontend/dist + the API on :3000
  *   bun run screenshots
  *
- * Most shots are of a signed-in member, because the dialogs they show are
- * members-only. The ones marked `as: 'guest'` and `as: 'visitor'` get their own
- * cookie-less contexts, so the README can also show what someone who has not
- * logged in sees and the login screen they land on first.
+ * Most shots are of a member, because the dialogs they show are members-only.
+ * The one marked `as: 'guest'` gets its own context, so the README can also
+ * show what someone without an account sees.
+ *
+ * Nobody signs in: the server runs with AUTH_DEV_BYPASS=true and takes the
+ * address from the `x-dev-email` header each context sends.
  *
  * Chromium, not the WebKit the e2e test uses: Safari is what the garden group
  * browses with, but Chromium is what rasterises deterministically and honours
@@ -29,8 +31,7 @@ import { join } from 'node:path'
 
 const BASE = process.env.BASE ?? 'http://localhost:3000'
 const OUT = process.env.OUT ?? 'docs/screenshots'
-const USER = process.env.SHOT_USER ?? 'anna'
-const PASSWORD = process.env.SHOT_PASSWORD ?? 'gartenzaun'
+const EMAIL = process.env.SHOT_EMAIL ?? 'anna@example.com'
 
 /** An open day in the current month -- the deep link preselects it and opens the dialog. */
 const OPEN_DAY = '2026-09-26'
@@ -94,14 +95,6 @@ const shots = [
     ready: (page) => page.getByText(/Nur zum Anschauen/).waitFor(),
   },
   {
-    file: '10-anmelden.webp',
-    path: '/login',
-    // The first screen anyone meets, so it belongs in the README. Neither a
-    // cookie nor the guest flag, which is what makes the gate redirect here.
-    as: 'visitor',
-    ready: (page) => page.getByRole('button', { name: 'Als Gast ansehen' }).waitFor(),
-  },
-  {
     file: '06-ausgaben.webp',
     path: '/expenses',
     ready: (page) => page.getByRole('button', { name: 'Neuer Eintrag' }).waitFor(),
@@ -151,47 +144,20 @@ const contextOptions = {
   locale: 'de-CH',
   timezoneId: 'Europe/Zurich', // pins both the Intl output and where "today" falls
 }
-const context = await browser.newContext(contextOptions)
-
-/**
- * Signs in over plain fetch and hands the cookie to the context, rather than
- * using playwright's own request API: that one parses the response URL with
- * `new URL()` and under Bun it is handed a relative path, which throws.
- */
-async function sessionCookie() {
-  const res = await fetch(`${BASE}/api/auth/login`, {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ username: USER, password: PASSWORD }),
-  })
-  if (!res.ok) {
-    throw new Error(
-      `Login als "${USER}" fehlgeschlagen (${res.status}). bun run demo-data?`,
-    )
-  }
-  const [name, value] = res.headers.getSetCookie()[0].split(';')[0].split('=')
-  return { name, value, url: BASE }
-}
-
-// One cookie signs in every page this context opens.
-await context.addCookies([await sessionCookie()])
-
-// Two contexts that never log in. The guest one carries the flag the login
-// screen's button writes, which is what gets it past the gate in __root.tsx;
-// the visitor one carries nothing, so it lands on the login screen itself.
-const guestContext = await browser.newContext(contextOptions)
-await guestContext.addInitScript(() => {
-  try {
-    localStorage.setItem('puent.guest', '1')
-  } catch {
-    // Matches the app's own handling -- a browser that refuses to store it
-    // would simply bounce this context back to the login screen.
-  }
+// One header makes every page this context opens a member's.
+const context = await browser.newContext({
+  ...contextOptions,
+  extraHTTPHeaders: { 'x-dev-email': EMAIL },
 })
 
-const visitorContext = await browser.newContext(contextOptions)
+// An address with no account behind it, which is exactly what a guest is:
+// somebody Access let in whom the `users` table does not know.
+const guestContext = await browser.newContext({
+  ...contextOptions,
+  extraHTTPHeaders: { 'x-dev-email': 'besuch@example.com' },
+})
 
-const contexts = { guest: guestContext, visitor: visitorContext }
+const contexts = { guest: guestContext }
 
 console.log(`Capturing ${shots.length} shots from ${BASE}`)
 

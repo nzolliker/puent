@@ -1,24 +1,25 @@
 /**
- * Creates a gardener, or resets one who forgot their password, and prints the
- * single-use link they open to choose a password themselves.
+ * Creates a gardener, or changes the e-mail address of one.
  *
- *   bun run create-user nicola "Nicola"
- *   bun run create-user nicola --reset
+ *   bun run create-user nicola "Nicola" nicola@example.ch
+ *   bun run create-user nicola --email nicola@example.com
  *
- * There is no e-mail server anywhere in this project, so the link is the whole
- * delivery mechanism: copy it into the group chat. It is valid for seven days
- * and stops working the moment it is used.
+ * The app has no login of its own. Cloudflare Access signs people in and tells
+ * the app their e-mail address; an account here is what turns that address
+ * into a gardener who can write, under the display name given.
  *
- * A reset drops that account's existing sessions -- but only when the link is
- * opened and a new password set, not when this command runs. Until then the
- * old session stays live, so if you are resetting because somebody else may
- * have the password, clear that account's `sessions` rows yourself too.
+ * So there are two lists, and a new gardener has to be on both:
+ *
+ *   1. the Access policy, which decides who reaches the app at all
+ *   2. this table, which decides who may change something once inside
+ *
+ * Somebody on the first list only is a guest: they see everything and can
+ * enter nothing.
  *
  * Unlike demo-data, this is meant to run against production too -- on the Pi
  * that is `docker exec -it puent-app bun run create-user ...`.
  */
 import 'dotenv/config'
-import { createHash } from 'node:crypto'
 import mysql from 'mysql2/promise'
 
 const url = process.env.DATABASE_URL
@@ -27,12 +28,21 @@ if (!url) {
   process.exit(1)
 }
 
-const args = process.argv.slice(2)
-const reset = args.includes('--reset')
-const [username, displayName] = args.filter((arg) => arg !== '--reset')
+const USAGE =
+  'Usage: bun run create-user <username> "<display name>" <email>\n' +
+  '       bun run create-user <username> --email <email>'
 
-if (!username) {
-  console.error('Usage: bun run create-user <username> "<display name>" [--reset]')
+const args = process.argv.slice(2)
+const flag = args.indexOf('--email')
+const changeEmail = flag !== -1
+
+const username = args[0]
+const displayName = changeEmail ? undefined : args[1]
+// Lowercase, because that is how the server compares it against the token.
+const email = (changeEmail ? args[flag + 1] : args[2])?.trim().toLowerCase()
+
+if (!username || username.startsWith('--')) {
+  console.error(USAGE)
   process.exit(1)
 }
 
@@ -41,60 +51,52 @@ if (!/^[a-z0-9_-]{3,60}$/.test(username)) {
   process.exit(1)
 }
 
-if (!reset && !displayName) {
+if (!changeEmail && !displayName) {
   console.error('A display name is required -- it is the name that shows up on a')
-  console.error('watering day and on an expense. Use --reset for an existing account.')
+  console.error('watering day and on an expense. Use --email for an existing account.')
   process.exit(1)
 }
 
-// Same two helpers as server/lib/auth.ts: the raw token goes to the person,
-// only its hash goes in the table.
-function generateToken() {
-  const bytes = new Uint8Array(32)
-  crypto.getRandomValues(bytes)
-  return Buffer.from(bytes).toString('base64url')
-}
-
-function hashToken(token) {
-  return createHash('sha256').update(token).digest('hex')
+// Not a full validation, only enough to catch the arguments in the wrong order.
+if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 255) {
+  console.error('An e-mail address is required -- it is what Cloudflare Access')
+  console.error('identifies the person by.\n')
+  console.error(USAGE)
+  process.exit(1)
 }
 
 const db = await mysql.createConnection(url)
 
 try {
   const [existing] = await db.query('SELECT `id`, `name` FROM `users` WHERE `username` = ?', [username])
-  let userId = existing[0]?.id
+  const userId = existing[0]?.id
 
-  if (reset) {
-    if (!userId) {
-      console.error(`No account called "${username}". Drop --reset to create one.`)
-      process.exit(1)
-    }
-    console.log(`Resetting ${existing[0].name} (${username})`)
-  } else if (userId) {
-    console.error(`"${username}" already exists. Use --reset to send a new link.`)
+  const [taken] = await db.query('SELECT `username` FROM `users` WHERE `email` = ?', [email])
+  if (taken[0] && taken[0].username !== username) {
+    console.error(`${email} already belongs to "${taken[0].username}".`)
     process.exit(1)
-  } else {
-    const [result] = await db.query(
-      'INSERT INTO `users` (`username`, `name`) VALUES (?, ?)',
-      [username, displayName],
-    )
-    userId = result.insertId
-    console.log(`Created ${displayName} (${username})`)
   }
 
-  const token = generateToken()
-  const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
+  if (changeEmail) {
+    if (!userId) {
+      console.error(`No account called "${username}". Drop --email to create one.`)
+      process.exit(1)
+    }
+    await db.query('UPDATE `users` SET `email` = ? WHERE `id` = ?', [email, userId])
+    console.log(`${existing[0].name} (${username}) is now ${email}`)
+  } else if (userId) {
+    console.error(`"${username}" already exists. Use --email to change the address.`)
+    process.exit(1)
+  } else {
+    await db.query(
+      'INSERT INTO `users` (`username`, `name`, `email`) VALUES (?, ?, ?)',
+      [username, displayName, email],
+    )
+    console.log(`Created ${displayName} (${username}) as ${email}`)
+  }
 
-  await db.query(
-    'INSERT INTO `setup_tokens` (`id`, `user_id`, `expires_at`) VALUES (?, ?, ?)',
-    [hashToken(token), userId, expiresAt],
-  )
-
-  const appUrl = (process.env.APP_URL ?? 'http://localhost:3000').replace(/\/$/, '')
-
-  console.log('\nSend this link -- it works once, and expires in 7 days:\n')
-  console.log(`  ${appUrl}/setup?token=${token}\n`)
+  console.log('\nThe same address has to be on the Cloudflare Access policy, or the')
+  console.log('person never reaches the app: Zero Trust -> Access -> Applications.\n')
 } finally {
   await db.end()
 }

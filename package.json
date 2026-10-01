@@ -6,6 +6,7 @@
     "start": "bun server/index.ts",
     "dev": "bun --watch server/index.ts",
     "typecheck": "tsc --noEmit",
+    "test": "bun test server",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "demo-data": "bun scripts/demo-data.mjs",
@@ -30,6 +31,7 @@
     "drizzle-orm": "^0.45.3",
     "drizzle-zod": "^0.8.3",
     "hono": "^4.13.12",
+    "jose": "^6.2.12",
     "mysql2": "^3.24.5",
     "sharp": "^0.35.5",
     "zod": "^4.6.5"

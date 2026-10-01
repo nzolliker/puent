@@ -36,8 +36,7 @@ git pull
 `
 docker compose --env-file .env.production ps
 docker logs puent-app --tail 100
-curl -i http://localhost:3000/
-curl -i http://localhost:3000/api/expenses
+curl -i http://localhost:3000/    # 403 is right: up, and guarded
 `
 
 ## Goal
@@ -163,24 +162,26 @@ It contains values such as:
 - `DATABASE_URL`
 - `UPLOAD_DIR=/app/uploads`
 - `RAIN_THRESHOLD_MM=2` (optional)
-- `APP_URL=https://<your-hostname>`
-- `COOKIE_SECURE=true`
+- `CF_ACCESS_TEAM_DOMAIN=https://<team>.cloudflareaccess.com`
+- `CF_ACCESS_AUD=<AUD tag of the Access application>`
 - `TUNNEL_TOKEN=<token from the Cloudflare dashboard>`
 
 `UPLOAD_DIR` has to be set here because `docker-compose.yml` lists the app's
 environment variables explicitly rather than passing the whole file through.
 It must point at the mount path of the `uploads` volume. The same applies to
-`APP_URL` and `COOKIE_SECURE`: adding them to this file only, without also
+the two `CF_ACCESS_*` variables: adding them to this file only, without also
 adding them to the `app.environment:` block, silently does nothing.
 
-`APP_URL` is only used to build the setup links `bun run create-user` prints,
-so it has to be the public hostname, the one address the garden group's phones
-can open.
+`CF_ACCESS_TEAM_DOMAIN` and `CF_ACCESS_AUD` are what the app checks every
+request's Access token against: that it was signed by this team, and issued for
+this application. The team domain is under Zero Trust → Settings; the AUD tag is
+on the Access application's overview page. Neither is a secret. Without both
+the server refuses to start, which is deliberate — the alternative would be an
+app that serves everyone when a line goes missing from this file.
 
-`COOKIE_SECURE` is `true` because the browser only reaches the app over the
-HTTPS that Cloudflare terminates. A `Secure` cookie is never sent over plain
-HTTP, so with the tunnel down nobody can log in on `http://localhost:3000`
-either; set it back to `false` only if you run the stack without the tunnel.
+`AUTH_DEV_BYPASS` must never appear in this file. It makes the server believe a
+plain request header, and exists for local development only. The server refuses
+to start if it is set next to the `CF_ACCESS_*` pair.
 
 `TUNNEL_TOKEN` is what lets `cloudflared` attach to the tunnel. Treat it like a
 password: whoever has it can serve the public hostname from their own machine.
@@ -227,28 +228,37 @@ phone ──HTTPS──> Cloudflare ──Access check──> tunnel ──> clo
   policy is a list of e-mail addresses; anyone else is turned away by
   Cloudflare and never reaches the Pi. People sign in with a one-time code sent
   to their address.
-- **The app's own login** still applies behind that. Access decides who gets to
-  the login screen; the account decides whose name goes on a watering day.
+- **The app** has no login of its own. Access attaches a signed token to every
+  request it lets through (`Cf-Access-Jwt-Assertion`); the app verifies it and
+  takes the e-mail address in it as who is asking. A request without a valid
+  token gets `403` for everything, the frontend and the photos included.
 
 Two rules that keep this safe:
 
 1. The tunnel's public hostname and the Access application's hostname must be
    identical. A tunnel hostname that Access does not cover is public to the
    whole internet.
-2. Port 3000 stays bound to `127.0.0.1`. Published on `0.0.0.0`, anything on the
-   LAN could reach the app without passing Access.
+2. Port 3000 stays bound to `127.0.0.1`. The app would still refuse a LAN
+   request, since it carries no token, but there is no reason to offer the port.
+
+Sessions are Cloudflare's. How long somebody stays signed in is the session
+duration on the Access application, and separately the global session timeout
+under Zero Trust → Settings → Authentication, which defaults to 24 hours.
 
 ### Letting someone in
 
 1. Add their e-mail address to the Access policy (Zero Trust → Access →
    Applications → the app → Policies).
-2. Create their account and send them the setup link, see [Accounts](#accounts).
+2. Create their account under the same address, see [Accounts](#accounts).
+   Skip this for somebody who should only look.
 
 ### Checking it
 
 From a phone on mobile data, not the home WiFi:
 
-- the hostname shows the Cloudflare sign-in page, then the app's login screen
+- the hostname shows the Cloudflare sign-in page, then the app itself, with the
+  person's first name in the top right — or "Gast" for an address without an
+  account
 - an address that is not on the policy does not get in
 
 From any machine:
@@ -404,11 +414,16 @@ On the Pi:
 
 ```bash
 curl -i http://localhost:3000/
-curl -i http://localhost:3000/api/expenses
-curl -i http://localhost:3000/api/water-plants
 ```
 
-From another machine these no longer answer: port 3000 is bound to loopback,
+The answer is `403 Forbidden`, and that is the healthy one: the server is up and
+refuses a request that carries no Access token. There is no way to get a `200`
+out of it from the Pi itself — open the public hostname in a browser for that.
+No answer at all means the container is down; `docker logs puent-app` says why.
+A server that exits right after starting with "No identity source configured"
+is missing `CF_ACCESS_TEAM_DOMAIN` or `CF_ACCESS_AUD`.
+
+From another machine the port does not answer at all: it is bound to loopback,
 and the only way in is the public hostname, see
 [Access From Outside](#access-from-outside).
 
@@ -433,45 +448,47 @@ Why this approach is good:
 Verify after migration:
 
 ```bash
-curl -i http://localhost:3000/api/expenses
-curl -i http://localhost:3000/api/water-plants
 docker logs puent-app --tail 50
 ```
 
-Reading stays public, so those two still answer `200` without a session. A
-write should answer `401`:
-
-```bash
-curl -i -X POST http://localhost:3000/api/expenses \
-  -H 'content-type: application/json' -d '{}'
-```
+and open the public hostname in a browser. `curl` on the Pi cannot check this:
+without an Access token every path answers `403`, migrated or not.
 
 ## Accounts
 
-There is no registration page. Accounts are created from inside the container,
-and the person chooses their own password through a single-use link:
+The app has no login and stores no passwords. Cloudflare Access signs a person
+in and hands the app their e-mail address in a signed token; the app looks that
+address up in `users`.
+
+That makes two lists, and a gardener has to be on both:
+
+| List | Where | Decides |
+| --- | --- | --- |
+| Access policy | Zero Trust → Access → Applications → the app → Policies | who reaches the app at all |
+| `users` table | `bun run create-user` | who may change something, and under which name |
+
+Somebody on the Access policy only is a guest: they see everything and can
+enter nothing. The page tells them which address they came in with.
+
+Create an account from inside the container:
 
 ```bash
-docker exec -it puent-app bun run create-user nicola "Nicola"
+docker exec -it puent-app bun run create-user nicola "Nicola" nicola@example.ch
 ```
 
-It prints a `$APP_URL/setup?token=...` link. Send it over the group chat — it
-is valid for seven days and stops working the moment it is used.
-
-The same command resets a forgotten password:
+Change the address of an existing one:
 
 ```bash
-docker exec -it puent-app bun run create-user nicola --reset
+docker exec -it puent-app bun run create-user nicola --email nicola@example.com
 ```
 
-Resetting drops that account's existing sessions, but only once the person
-opens the link and sets a new password. Until then the old session stays live.
-That is fine for a forgotten password; if you are resetting because somebody
-else may have the old one, delete that account's rows from `sessions` as well
-rather than waiting.
+The address has to be the one the person types on the Cloudflare sign-in page.
+Upper and lower case do not matter.
 
-There is no mail server anywhere in this setup, so the link is the whole
-delivery mechanism.
+To take somebody's access away, remove the address from the Access policy —
+that is the list that keeps people out. A session they already have stays valid
+until it expires, so for an immediate cut also use "Revoke existing tokens" on
+the application. Deleting the row in `users` only turns them into a guest.
 
 ## Build The App Image
 
@@ -550,8 +567,7 @@ This step matters whenever the new app version depends on new or changed tables/
 ```bash
 docker compose --env-file .env.production ps
 docker logs puent-app --tail 100
-curl -i http://localhost:3000/
-curl -i http://localhost:3000/api/expenses
+curl -i http://localhost:3000/    # 403 is right: up, and guarded
 ```
 
 ## Recommended Deployment Order
@@ -694,8 +710,6 @@ This runbook assumes:
 
 This setup is intentionally simple. Later improvements could include:
 
-- replacing the app's own login with the identity Cloudflare Access already
-  established, so people sign in once instead of twice
 - running the app container as a non-root user
 - adding backups for the MySQL volume
 - adding a dedicated deploy script
