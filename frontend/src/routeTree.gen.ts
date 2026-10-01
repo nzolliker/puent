@@ -9,25 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as WaterPlantsRouteImport } from './routes/waterPlants'
-import { Route as FotosRouteImport } from './routes/fotos'
-import { Route as ExpensesRouteImport } from './routes/expenses'
-import { Route as AufgabenRouteImport } from './routes/aufgaben'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AufgabenRouteImport } from './routes/aufgaben'
+import { Route as ExpensesRouteImport } from './routes/expenses'
+import { Route as FotosRouteImport } from './routes/fotos'
+import { Route as WaterPlantsRouteImport } from './routes/waterPlants'
 
-const WaterPlantsRoute = WaterPlantsRouteImport.update({
-  id: '/waterPlants',
-  path: '/waterPlants',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FotosRoute = FotosRouteImport.update({
-  id: '/fotos',
-  path: '/fotos',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const ExpensesRoute = ExpensesRouteImport.update({
-  id: '/expenses',
-  path: '/expenses',
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AufgabenRoute = AufgabenRouteImport.update({
@@ -35,9 +25,19 @@ const AufgabenRoute = AufgabenRouteImport.update({
   path: '/aufgaben',
   getParentRoute: () => rootRouteImport,
 } as any)
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
+const ExpensesRoute = ExpensesRouteImport.update({
+  id: '/expenses',
+  path: '/expenses',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FotosRoute = FotosRouteImport.update({
+  id: '/fotos',
+  path: '/fotos',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WaterPlantsRoute = WaterPlantsRouteImport.update({
+  id: '/waterPlants',
+  path: '/waterPlants',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -81,25 +81,11 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/waterPlants': {
-      id: '/waterPlants'
-      path: '/waterPlants'
-      fullPath: '/waterPlants'
-      preLoaderRoute: typeof WaterPlantsRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/fotos': {
-      id: '/fotos'
-      path: '/fotos'
-      fullPath: '/fotos'
-      preLoaderRoute: typeof FotosRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/expenses': {
-      id: '/expenses'
-      path: '/expenses'
-      fullPath: '/expenses'
-      preLoaderRoute: typeof ExpensesRouteImport
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/aufgaben': {
@@ -109,11 +95,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AufgabenRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
+    '/expenses': {
+      id: '/expenses'
+      path: '/expenses'
+      fullPath: '/expenses'
+      preLoaderRoute: typeof ExpensesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/fotos': {
+      id: '/fotos'
+      path: '/fotos'
+      fullPath: '/fotos'
+      preLoaderRoute: typeof FotosRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/waterPlants': {
+      id: '/waterPlants'
+      path: '/waterPlants'
+      fullPath: '/waterPlants'
+      preLoaderRoute: typeof WaterPlantsRouteImport
       parentRoute: typeof rootRouteImport
     }
   }
