@@ -4,8 +4,6 @@ import { useForm } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Calendar, CalendarDayButton } from '@/components/ui/calendar'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
 import {
     Dialog,
     DialogClose,
@@ -15,7 +13,6 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog'
-import { FieldGroup } from '@/components/ui/field'
 import { cn, dayKeyToDate, getFirstName, toLocalDayKey } from '@/lib/utils'
 import { api } from '@/lib/api'
 import { Slider } from '@/components/ui/slider'
@@ -27,6 +24,8 @@ import {
     getRainDays,
     rainLabel,
 } from '@/lib/rain'
+import { ReadOnlyNotice } from '@/components/access'
+import { useCanEdit } from '@/lib/auth'
 import { createWaterFormSchema } from '@server/sharedTypes'
 
 const dayKeyPattern = /^\d{4}-\d{2}-\d{2}$/
@@ -67,7 +66,6 @@ export const Route = createFileRoute('/waterPlants')({
 })
 
 type WaterFormValues = {
-    name: string
     date: Date | null
 }
 
@@ -95,10 +93,10 @@ function formatPickedDate(value: Date) {
     }).format(value)
 }
 
-async function handleEnroll(value: { name: string; date: Date }) {
+// No name in the payload: the server reads it off the session.
+async function handleEnroll(value: { date: Date }) {
     const res = await api['water-plants'].$post({
         json: {
-            ...value,
             date: toLocalDayKey(value.date),
         },
     })
@@ -127,12 +125,11 @@ async function getAllDates() {
 }
 
 function useWaterForm(
-    onEnroll: (value: { name: string; date: Date }) => Promise<void>,
+    onEnroll: (value: { date: Date }) => Promise<void>,
     initialDate: Date | null,
 ) {
     return useForm({
         defaultValues: {
-            name: '',
             date: initialDate,
         } as WaterFormValues,
         validators: {
@@ -143,12 +140,16 @@ function useWaterForm(
                 return
             }
 
-            await onEnroll({ name: value.name, date: value.date })
+            await onEnroll({ date: value.date })
         },
     })
 }
 
 function WaterDialog({ open, onOpenChange, pickedDate, form }: WaterDialogProps) {
+    // Asked again here: a `?date=` link opens this dialog without going past
+    // the button on the page.
+    const canEdit = useCanEdit()
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
             <DialogContent className="top-[10dvh] bottom-auto max-h-[calc(100dvh-12dvh)] translate-y-0 gap-0 overflow-y-auto p-0 sm:top-[50%] sm:max-w-sm sm:translate-y-[-50%]">
@@ -158,34 +159,18 @@ function WaterDialog({ open, onOpenChange, pickedDate, form }: WaterDialogProps)
                         Möchtest du am {formatPickedDate(pickedDate)} giessen?
                     </DialogDescription>
                 </DialogHeader>
-                <FieldGroup className="px-4 pt-4 sm:px-6">
-                    <form.Field
-                        name="name"
-                        children={(field) => (
-                            <>
-                                <Label htmlFor={field.name}>Name</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    placeholder="Wer?"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                            </>
-                        )}
-                    />
-                </FieldGroup>
-                <DialogFooter className="sticky bottom-0 border-t bg-background px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+                {/* Nothing left to fill in -- the name comes from the session, so
+                    this is a confirmation rather than a form. */}
+                <DialogFooter className="sticky bottom-0 mt-4 border-t bg-background px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
                     <DialogClose asChild>
                         <Button variant="outline">Abbrechen</Button>
                     </DialogClose>
                     <form.Subscribe
-                        selector={(state) => [state.values.name, state.isSubmitting] as const}
-                        children={([name, isSubmitting]) => (
+                        selector={(state) => state.isSubmitting}
+                        children={(isSubmitting) => (
                             <Button
                                 type="button"
-                                disabled={name.trim().length === 0 || isSubmitting}
+                                disabled={isSubmitting || !canEdit}
                                 onClick={async () => {
                                     await form.handleSubmit()
                                 }}
@@ -284,6 +269,7 @@ function Giessen() {
     // Arriving with `?date=` (from the dashboard card) preselects that day and opens
     // the dialog straight away.
     const [dialogOpen, setDialogOpen] = useState(Boolean(dateParam))
+    const canEdit = useCanEdit()
     const navigate = Route.useNavigate()
     const queryClient = useQueryClient()
     const { error, data } = useQuery({
@@ -472,11 +458,12 @@ function Giessen() {
                                 <Button
                                     className="mt-3"
                                     type="button"
-                                    disabled={!pickedDate || pickedIsBooked}
+                                    disabled={!pickedDate || pickedIsBooked || !canEdit}
                                     onClick={() => setDialogOpen(true)}
                                 >
                                     Einschreiben
                                 </Button>
+                                <ReadOnlyNotice className="mt-2 text-center" />
                             </>
                         )
                     }}

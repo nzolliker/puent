@@ -161,10 +161,22 @@ It contains values such as:
 - `DATABASE_URL`
 - `UPLOAD_DIR=/app/uploads`
 - `RAIN_THRESHOLD_MM=2` (optional)
+- `APP_URL=http://<pi-host>:3000`
+- `COOKIE_SECURE=false`
 
 `UPLOAD_DIR` has to be set here because `docker-compose.yml` lists the app's
 environment variables explicitly rather than passing the whole file through.
-It must point at the mount path of the `uploads` volume.
+It must point at the mount path of the `uploads` volume. The same applies to
+`APP_URL` and `COOKIE_SECURE`: adding them to this file only, without also
+adding them to the `app.environment:` block, silently does nothing.
+
+`APP_URL` is only used to build the setup links `bun run create-user` prints,
+so it has to be an address the garden group's phones can actually open.
+
+`COOKIE_SECURE` stays `false` as long as the Pi serves plain HTTP. A `Secure`
+cookie is never sent over HTTP, so setting it to `true` today would mean nobody
+could stay logged in. Set it to `true` on the day a reverse proxy terminates TLS
+in front of the app.
 
 `RAIN_THRESHOLD_MM` is how many millimetres of rain make a day count as a rain
 day in the Giess-Plan. It can be left out — `docker-compose.yml` falls back to
@@ -361,6 +373,41 @@ curl -i http://localhost:3000/api/expenses
 curl -i http://localhost:3000/api/water-plants
 docker logs puent-app --tail 50
 ```
+
+Reading stays public, so those two still answer `200` without a session. A
+write should answer `401`:
+
+```bash
+curl -i -X POST http://localhost:3000/api/expenses \
+  -H 'content-type: application/json' -d '{}'
+```
+
+## Accounts
+
+There is no registration page. Accounts are created from inside the container,
+and the person chooses their own password through a single-use link:
+
+```bash
+docker exec -it puent-app bun run create-user nicola "Nicola"
+```
+
+It prints a `$APP_URL/setup?token=...` link. Send it over the group chat — it
+is valid for seven days and stops working the moment it is used.
+
+The same command resets a forgotten password:
+
+```bash
+docker exec -it puent-app bun run create-user nicola --reset
+```
+
+Resetting drops that account's existing sessions, but only once the person
+opens the link and sets a new password. Until then the old session stays live.
+That is fine for a forgotten password; if you are resetting because somebody
+else may have the old one, delete that account's rows from `sessions` as well
+rather than waiting.
+
+There is no mail server anywhere in this setup, so the link is the whole
+delivery mechanism.
 
 ## Build The App Image
 
@@ -572,7 +619,7 @@ Critical:
 This runbook assumes:
 
 - the app is exposed on port `3000`
-- MySQL is exposed on port `3306`
+- MySQL is published on `127.0.0.1:3306`, reachable on the Pi but not from the LAN
 - the Bun server serves static files from `frontend/dist`
 - the API lives under `/api`
 - Drizzle migrations are in `drizzle/`

@@ -10,6 +10,8 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WaterPlantsRouteImport } from './routes/waterPlants'
+import { Route as SetupRouteImport } from './routes/setup'
+import { Route as LoginRouteImport } from './routes/login'
 import { Route as FotosRouteImport } from './routes/fotos'
 import { Route as ExpensesRouteImport } from './routes/expenses'
 import { Route as AufgabenRouteImport } from './routes/aufgaben'
@@ -18,6 +20,16 @@ import { Route as IndexRouteImport } from './routes/index'
 const WaterPlantsRoute = WaterPlantsRouteImport.update({
   id: '/waterPlants',
   path: '/waterPlants',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SetupRoute = SetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LoginRoute = LoginRouteImport.update({
+  id: '/login',
+  path: '/login',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FotosRoute = FotosRouteImport.update({
@@ -46,6 +58,8 @@ export interface FileRoutesByFullPath {
   '/aufgaben': typeof AufgabenRoute
   '/expenses': typeof ExpensesRoute
   '/fotos': typeof FotosRoute
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
   '/waterPlants': typeof WaterPlantsRoute
 }
 export interface FileRoutesByTo {
@@ -53,6 +67,8 @@ export interface FileRoutesByTo {
   '/aufgaben': typeof AufgabenRoute
   '/expenses': typeof ExpensesRoute
   '/fotos': typeof FotosRoute
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
   '/waterPlants': typeof WaterPlantsRoute
 }
 export interface FileRoutesById {
@@ -61,14 +77,38 @@ export interface FileRoutesById {
   '/aufgaben': typeof AufgabenRoute
   '/expenses': typeof ExpensesRoute
   '/fotos': typeof FotosRoute
+  '/login': typeof LoginRoute
+  '/setup': typeof SetupRoute
   '/waterPlants': typeof WaterPlantsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/aufgaben' | '/expenses' | '/fotos' | '/waterPlants'
+  fullPaths:
+    | '/'
+    | '/aufgaben'
+    | '/expenses'
+    | '/fotos'
+    | '/login'
+    | '/setup'
+    | '/waterPlants'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/aufgaben' | '/expenses' | '/fotos' | '/waterPlants'
-  id: '__root__' | '/' | '/aufgaben' | '/expenses' | '/fotos' | '/waterPlants'
+  to:
+    | '/'
+    | '/aufgaben'
+    | '/expenses'
+    | '/fotos'
+    | '/login'
+    | '/setup'
+    | '/waterPlants'
+  id:
+    | '__root__'
+    | '/'
+    | '/aufgaben'
+    | '/expenses'
+    | '/fotos'
+    | '/login'
+    | '/setup'
+    | '/waterPlants'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -76,6 +116,8 @@ export interface RootRouteChildren {
   AufgabenRoute: typeof AufgabenRoute
   ExpensesRoute: typeof ExpensesRoute
   FotosRoute: typeof FotosRoute
+  LoginRoute: typeof LoginRoute
+  SetupRoute: typeof SetupRoute
   WaterPlantsRoute: typeof WaterPlantsRoute
 }
 
@@ -86,6 +128,20 @@ declare module '@tanstack/react-router' {
       path: '/waterPlants'
       fullPath: '/waterPlants'
       preLoaderRoute: typeof WaterPlantsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/setup': {
+      id: '/setup'
+      path: '/setup'
+      fullPath: '/setup'
+      preLoaderRoute: typeof SetupRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/login': {
+      id: '/login'
+      path: '/login'
+      fullPath: '/login'
+      preLoaderRoute: typeof LoginRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/fotos': {
@@ -124,6 +180,8 @@ const rootRouteChildren: RootRouteChildren = {
   AufgabenRoute: AufgabenRoute,
   ExpensesRoute: ExpensesRoute,
   FotosRoute: FotosRoute,
+  LoginRoute: LoginRoute,
+  SetupRoute: SetupRoute,
   WaterPlantsRoute: WaterPlantsRoute,
 }
 export const routeTree = rootRouteImport

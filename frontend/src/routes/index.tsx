@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from '@tanstack/react-router'
+import { useCanEdit } from '@/lib/auth'
 
 import {
     Card,
@@ -63,6 +64,10 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
         isPast && 'opacity-60',
     )
 
+    // A guest sees the open day, but the chip does not promise a signup it
+    // cannot deliver -- it only links onwards for a member.
+    const canEdit = useCanEdit()
+
     // A taken rain day keeps the names -- the green/blue split already carries
     // the rain, and the name is the more useful thing in a chip this size.
     const chipContent = day.isOpen ? (
@@ -79,6 +84,15 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
 
     const rainTitle = rainSource ? `${rainLabel(rainSource)} ${day.precipMm} mm` : null
 
+    // The span stands in for two different days: one that is taken, and an open
+    // one a guest cannot sign up for. Only the latter is still worth labelling
+    // "Noch offen".
+    const spanTitle = day.isOpen
+        ? rainTitle
+            ? `Noch offen · ${rainTitle}`
+            : 'Noch offen'
+        : (rainTitle ?? undefined)
+
     return (
         <div className="flex flex-col items-center gap-1">
             <div
@@ -91,7 +105,7 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
                 <div>{date.getDate()}.</div>
             </div>
             <div className={cn('w-full rounded-md', day.isToday && 'ring-2 ring-primary')}>
-                {day.isOpen ? (
+                {day.isOpen && canEdit ? (
                     <Link
                         to="/waterPlants"
                         search={{ date: day.date }}
@@ -105,7 +119,7 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
                         {chipContent}
                     </Link>
                 ) : (
-                    <span className={chipClasses} title={rainTitle ?? undefined}>
+                    <span className={chipClasses} title={spanTitle}>
                         {chipContent}
                     </span>
                 )}

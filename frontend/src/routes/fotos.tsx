@@ -4,6 +4,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ImagePlus, Loader2, Plus, Trash2, Upload, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { MemberOnly, ReadOnlyNotice } from '@/components/access'
+import { useCanEdit } from '@/lib/auth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -87,15 +89,17 @@ function AlbumChips({
                     <span className="ml-1.5 text-xs opacity-70">{album.photoCount}</span>
                 </button>
             ))}
-            <button
-                type="button"
-                onClick={onCreate}
-                className={cn(chip, 'flex items-center gap-1 border-dashed text-muted-foreground')}
-                title="Neues Album"
-            >
-                <Plus className="h-3.5 w-3.5" />
-                Neu
-            </button>
+            <MemberOnly>
+                <button
+                    type="button"
+                    onClick={onCreate}
+                    className={cn(chip, 'flex items-center gap-1 border-dashed text-muted-foreground')}
+                    title="Neues Album"
+                >
+                    <Plus className="h-3.5 w-3.5" />
+                    Neu
+                </button>
+            </MemberOnly>
         </div>
     )
 }
@@ -345,6 +349,7 @@ function Fotos() {
     const { album: albumId } = Route.useSearch()
     const queryClient = useQueryClient()
 
+    const canEdit = useCanEdit()
     const [uploadOpen, setUploadOpen] = useState(false)
     const [albumOpen, setAlbumOpen] = useState(false)
     const [albumName, setAlbumName] = useState('')
@@ -392,11 +397,16 @@ function Fotos() {
                         {photos.length} {photos.length === 1 ? 'Bild' : 'Bilder'}
                     </p>
                 </div>
-                <Button type="button" onClick={() => setUploadOpen(true)}>
+                <Button
+                    type="button"
+                    disabled={!canEdit}
+                    onClick={() => setUploadOpen(true)}
+                >
                     <ImagePlus className="h-4 w-4" />
                     Hochladen
                 </Button>
             </div>
+            <ReadOnlyNotice className="mb-3 px-0" />
 
             <div className="mb-4">
                 <AlbumChips
@@ -466,15 +476,17 @@ function Fotos() {
                                     )}
                                     <p className="text-xs text-muted-foreground">{photoDate(activePhoto)}</p>
                                 </div>
-                                <Button
-                                    variant="outline"
-                                    type="button"
-                                    disabled={deletePhotoMutation.isPending}
-                                    onClick={() => deletePhotoMutation.mutate(activePhoto.id)}
-                                    title="Foto löschen"
-                                >
-                                    <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <MemberOnly>
+                                    <Button
+                                        variant="outline"
+                                        type="button"
+                                        disabled={deletePhotoMutation.isPending}
+                                        onClick={() => deletePhotoMutation.mutate(activePhoto.id)}
+                                        title="Foto löschen"
+                                    >
+                                        <Trash2 className="h-4 w-4" />
+                                    </Button>
+                                </MemberOnly>
                             </div>
                         </>
                     )}

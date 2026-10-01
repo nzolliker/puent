@@ -28,6 +28,8 @@ import {
 } from '@/components/ui/table'
 import { Skeleton } from '@/components/ui/skeleton'
 import { api } from '@/lib/api'
+import { MemberOnly, ReadOnlyNotice } from '@/components/access'
+import { useCanEdit } from '@/lib/auth'
 import { dayKeyToDate, getFirstName, toLocalDayKey } from '@/lib/utils'
 import { createExpenseFormSchema } from '@server/sharedTypes'
 
@@ -39,7 +41,6 @@ type ExpenseFormValues = {
     title: string
     amount: string
     date: Date
-    createdBy: string
 }
 
 const amountFormat = new Intl.NumberFormat('de-CH', {
@@ -130,7 +131,6 @@ function NewExpenseDialog({
             title: '',
             amount: '',
             date: new Date(),
-            createdBy: '',
         } as ExpenseFormValues,
         validators: {
             onChange: createExpenseFormSchema,
@@ -214,23 +214,6 @@ function NewExpenseDialog({
                             </div>
                         )}
                     />
-                    <form.Field
-                        name="createdBy"
-                        children={(field) => (
-                            <div className="grid gap-2">
-                                <Label htmlFor={field.name}>Wer</Label>
-                                <Input
-                                    id={field.name}
-                                    name={field.name}
-                                    placeholder="Wer?"
-                                    value={field.state.value}
-                                    onBlur={field.handleBlur}
-                                    onChange={(e) => field.handleChange(e.target.value)}
-                                />
-                                <FieldInfo field={field} />
-                            </div>
-                        )}
-                    />
                 </FieldGroup>
                 <DialogFooter className="sticky bottom-0 mt-4 border-t bg-background px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
                     <DialogClose asChild>
@@ -246,8 +229,7 @@ function NewExpenseDialog({
                                 state.canSubmit,
                                 state.isSubmitting,
                                 state.values.title.trim().length > 0 &&
-                                    state.values.amount.trim().length > 0 &&
-                                    state.values.createdBy.trim().length > 0,
+                                    state.values.amount.trim().length > 0,
                             ] as const
                         }
                         children={([canSubmit, isSubmitting, isFilled]) => (
@@ -270,6 +252,7 @@ function NewExpenseDialog({
 
 function Expenses() {
     const [dialogOpen, setDialogOpen] = useState(false)
+    const canEdit = useCanEdit()
     const queryClient = useQueryClient()
     const { isPending, error, data } = useQuery({
         queryKey: ['get-all-expenses'],
@@ -290,11 +273,17 @@ function Expenses() {
         <div className="mx-auto max-w-2xl p-2">
             <div className="flex items-center justify-between gap-2 px-1">
                 <h1 className="text-xl font-bold">Ausgaben</h1>
-                <Button type="button" size="sm" onClick={() => setDialogOpen(true)}>
+                <Button
+                    type="button"
+                    size="sm"
+                    disabled={!canEdit}
+                    onClick={() => setDialogOpen(true)}
+                >
                     <Plus />
                     Neuer Eintrag
                 </Button>
             </div>
+            <ReadOnlyNotice className="mt-1" />
 
             <div className="mt-3 rounded-lg border">
                 <Table className="text-xs">
@@ -344,16 +333,18 @@ function Expenses() {
                                         {expense.createdBy ? getFirstName(expense.createdBy) : '—'}
                                     </TableCell>
                                     <TableCell className="pl-0">
-                                        <Button
-                                            variant="ghost"
-                                            size="icon-xs"
-                                            type="button"
-                                            aria-label={`${expense.title} löschen`}
-                                            disabled={deleteExpenseMutation.isPending}
-                                            onClick={() => deleteExpenseMutation.mutate(expense.id)}
-                                        >
-                                            <Trash2 />
-                                        </Button>
+                                        <MemberOnly>
+                                            <Button
+                                                variant="ghost"
+                                                size="icon-xs"
+                                                type="button"
+                                                aria-label={`${expense.title} löschen`}
+                                                disabled={deleteExpenseMutation.isPending}
+                                                onClick={() => deleteExpenseMutation.mutate(expense.id)}
+                                            >
+                                                <Trash2 />
+                                            </Button>
+                                        </MemberOnly>
                                     </TableCell>
                                 </TableRow>
                             ))

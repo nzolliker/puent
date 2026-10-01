@@ -5,9 +5,14 @@
  * a UI change instead of quietly going stale -- re-run this whenever a screen
  * in the README looks different from the app.
  *
- *   bun run demo-data      # the data the shots depend on
+ *   bun run demo-data      # the data and the accounts the shots depend on
  *   bun run dev            # serves frontend/dist + the API on :3000
  *   bun run screenshots
+ *
+ * Most shots are of a signed-in member, because the dialogs they show are
+ * members-only. The ones marked `as: 'guest'` and `as: 'visitor'` get their own
+ * cookie-less contexts, so the README can also show what someone who has not
+ * logged in sees and the login screen they land on first.
  *
  * Chromium, not the WebKit the e2e test uses: Safari is what the garden group
  * browses with, but Chromium is what rasterises deterministically and honours
@@ -24,6 +29,8 @@ import { join } from 'node:path'
 
 const BASE = process.env.BASE ?? 'http://localhost:3000'
 const OUT = process.env.OUT ?? 'docs/screenshots'
+const USER = process.env.SHOT_USER ?? 'anna'
+const PASSWORD = process.env.SHOT_PASSWORD ?? 'gartenzaun'
 
 /** An open day in the current month -- the deep link preselects it and opens the dialog. */
 const OPEN_DAY = '2026-09-26'
@@ -80,6 +87,21 @@ const shots = [
     cropTo: '[role=dialog]',
   },
   {
+    file: '09-nur-lesen.webp',
+    path: '/aufgaben',
+    // What a guest sees: the list in full, the buttons out of reach.
+    as: 'guest',
+    ready: (page) => page.getByText(/Nur zum Anschauen/).waitFor(),
+  },
+  {
+    file: '10-anmelden.webp',
+    path: '/login',
+    // The first screen anyone meets, so it belongs in the README. Neither a
+    // cookie nor the guest flag, which is what makes the gate redirect here.
+    as: 'visitor',
+    ready: (page) => page.getByRole('button', { name: 'Als Gast ansehen' }).waitFor(),
+  },
+  {
     file: '06-ausgaben.webp',
     path: '/expenses',
     ready: (page) => page.getByRole('button', { name: 'Neuer Eintrag' }).waitFor(),
@@ -121,19 +143,60 @@ const PAD = 12 // a little breathing room under the last element
 // --lang is what a native <input type="date"> reads for its placeholder. The
 // context locale alone leaves it as mm/dd/yyyy, which no Swiss phone shows.
 const browser = await chromium.launch({ args: ['--lang=de-CH'] })
-const context = await browser.newContext({
+const contextOptions = {
   viewport: PHONE,
   deviceScaleFactor: 2, // 780px wide, just under GitHub's README column
   colorScheme: 'dark',
   reducedMotion: 'reduce', // the dialogs animate in; without this they are caught mid-fade
   locale: 'de-CH',
   timezoneId: 'Europe/Zurich', // pins both the Intl output and where "today" falls
+}
+const context = await browser.newContext(contextOptions)
+
+/**
+ * Signs in over plain fetch and hands the cookie to the context, rather than
+ * using playwright's own request API: that one parses the response URL with
+ * `new URL()` and under Bun it is handed a relative path, which throws.
+ */
+async function sessionCookie() {
+  const res = await fetch(`${BASE}/api/auth/login`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ username: USER, password: PASSWORD }),
+  })
+  if (!res.ok) {
+    throw new Error(
+      `Login als "${USER}" fehlgeschlagen (${res.status}). bun run demo-data?`,
+    )
+  }
+  const [name, value] = res.headers.getSetCookie()[0].split(';')[0].split('=')
+  return { name, value, url: BASE }
+}
+
+// One cookie signs in every page this context opens.
+await context.addCookies([await sessionCookie()])
+
+// Two contexts that never log in. The guest one carries the flag the login
+// screen's button writes, which is what gets it past the gate in __root.tsx;
+// the visitor one carries nothing, so it lands on the login screen itself.
+const guestContext = await browser.newContext(contextOptions)
+await guestContext.addInitScript(() => {
+  try {
+    localStorage.setItem('puent.guest', '1')
+  } catch {
+    // Matches the app's own handling -- a browser that refuses to store it
+    // would simply bounce this context back to the login screen.
+  }
 })
+
+const visitorContext = await browser.newContext(contextOptions)
+
+const contexts = { guest: guestContext, visitor: visitorContext }
 
 console.log(`Capturing ${shots.length} shots from ${BASE}`)
 
-for (const { file, path, prepare, ready, cropTo, viewport } of shots) {
-  const page = await context.newPage()
+for (const { file, path, prepare, ready, cropTo, viewport, as } of shots) {
+  const page = await (as ? contexts[as] : context).newPage()
   if (viewport) await page.setViewportSize(viewport)
   await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
 
