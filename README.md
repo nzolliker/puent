@@ -79,19 +79,21 @@ change instead of quietly going stale.
 </table>
 
 **Accounts**
-- The app opens on a login screen. Past it either by signing in, or with **Als
-  Gast ansehen** — a guest reads everything (the rota, the expenses, the to-dos
-  and the photos) and changes nothing.
-- Signing up for a day or adding an expense no longer asks who you are — the
-  name comes off the session, so a row belongs to an account rather than to
-  whatever was typed in the box.
-- There is no registration form. `bun run create-user` prints a single-use link
-  that the person opens to choose their own password; the same command issues a
-  new one when somebody forgets theirs.
+- The app has no login screen and stores no passwords. Cloudflare Access signs
+  people in with a one-time code sent to their e-mail address, before the app
+  is reached, and passes that address on in a signed token. The server verifies
+  the token on every request and refuses anything that arrives without one.
+- An address with an account behind it is a member. Any other address Access
+  lets through is a guest, who reads everything (the rota, the expenses, the
+  to-dos and the photos) and changes nothing.
+- Signing up for a day or adding an expense does not ask who you are — the name
+  comes off the account, so a row belongs to a person rather than to whatever
+  was typed in the box.
+- There is no registration form. `bun run create-user` ties an address to a
+  display name; the same address has to be on the Access policy.
 
 <p>
-<img src="docs/screenshots/10-anmelden.webp" alt="The login screen with a username and password field and, below a divider, a button reading Als Gast ansehen" width="300">
-<img src="docs/screenshots/09-nur-lesen.webp" alt="The tasks page seen as a guest: the list is readable, the buttons are disabled" width="300">
+<img src="docs/screenshots/09-nur-lesen.webp" alt="The tasks page seen as a guest: the list is readable, the buttons are disabled, and a line names the address that has no account" width="300">
 </p>
 
 **Fotos**
@@ -108,16 +110,13 @@ change instead of quietly going stale.
 
 The honest list, because most of it is visible in the screenshots above:
 
-- **Two logins.** The app is reachable from outside through a Cloudflare Tunnel,
-  and Cloudflare Access only lets listed e-mail addresses through. Behind that
-  the app still asks for its own username and password, because that is how it
-  knows whose name goes on a watering day. One sign-in should be enough.
-- **The guest gate is a courtesy, not a wall.** It is a flag in the browser, and
-  the read endpoints answer without a session either way. The wall is Cloudflare
-  Access in front of the app: whoever gets past it can read everything, and the
-  app itself would hand the data to anyone who reached port 3000 directly, which
-  is why that port is bound to loopback. Every *write* is refused by the server
-  independently of all that.
+- **Two lists to keep in step.** Who may reach the app is a policy in the
+  Cloudflare dashboard; who may write is the `users` table. A new gardener has
+  to be added to both, and nothing checks that they agree. Somebody on the
+  first list only is a guest, which is at least the safe way to be wrong.
+- **It only works behind Cloudflare.** The app trusts nothing but an Access
+  token, so on the Pi itself `curl localhost:3000` answers `403`, and if the
+  tunnel or Cloudflare is down there is no way in from the home network either.
 - **The UI language is inconsistent.** The nav and most screens are German, but
   the expenses table is still English, one button says "Submit", and the calendar
   header shows English weekday abbreviations. That screen is the oldest code in
@@ -181,7 +180,7 @@ cut at seven days, one short of the eight it reaches.
 | ORM | Drizzle | `server/db/index.ts`, schemas in `server/db/schema/` |
 | Migrations | drizzle-kit | `drizzle.config.ts`, SQL in `drizzle/` |
 | Validation | Zod + drizzle-zod | `server/sharedTypes.ts` |
-| Auth | own session cookies + `Bun.password` (argon2id) | `server/lib/auth.ts` |
+| Auth | Cloudflare Access token, verified with `jose` | `server/lib/access.ts`, `server/lib/auth.ts` |
 | UI | React 19 + Vite 7 | `frontend/` |
 | Routing | TanStack Router (file-based) | `frontend/src/routes/` |
 | Data / forms | TanStack Query + TanStack Form | per-route query helpers |
@@ -192,10 +191,18 @@ cut at seven days, one short of the eight it reaches.
 
 ## Testing
 
-There is one automated test, and it exists because the photo upload broke in
-four different ways that `curl` could not see. Half of that feature runs in the
-browser — HEIC decoding, the canvas conversion, the `FormData` the client
-builds — so the test drives a real browser:
+There are two automated tests, each for the part that would hurt most to get
+wrong.
+
+`bun run test` covers the one thing standing between the internet and the data:
+that a token is only accepted when Cloudflare signed it, for this application,
+and it has not expired — and that the server refuses to start when it has not
+been told where identity comes from.
+
+The other exists because the photo upload broke in four different ways that
+`curl` could not see. Half of that feature runs in the browser — HEIC decoding,
+the canvas conversion, the `FormData` the client builds — so the test drives a
+real browser:
 
 ```bash
 bun run dev                    # :3000
@@ -234,8 +241,6 @@ production, recovery — is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 - **Plant & harvest logs** — what went into which bed and when, and what came
   back out. The part that makes the app useful next year, not just this week.
-- **One sign-in** — take the identity from Cloudflare Access instead of asking
-  for a second password, and refuse every request that did not come through it.
 - **Per-person expense split** — who owes whom, now that an expense belongs to
   an account rather than to a typed-in name.
 
@@ -260,10 +265,21 @@ bun install
 cd frontend && bun install && cd ..
 
 # .env in the repo root
-echo 'DATABASE_URL=mysql://root:dev@localhost:3306/puent' > .env
+cat > .env <<'EOF'
+DATABASE_URL=mysql://root:dev@localhost:3306/puent
+AUTH_DEV_BYPASS=true
+DEV_USER_EMAIL=anna@example.com
+EOF
 
 bun run db:migrate
 ```
+
+In production the app learns who somebody is from a Cloudflare Access token, and
+there is no Cloudflare on a laptop. `AUTH_DEV_BYPASS=true` makes the server take
+the address from an `x-dev-email` request header instead, or from
+`DEV_USER_EMAIL` when there is none — which is what a browser sends. Without
+either that or the `CF_ACCESS_*` pair the server refuses to start, so it can
+never run unguarded by accident.
 
 `RAIN_THRESHOLD_MM` can go in the same file to change how much rain makes a day
 count as a rain day; it defaults to `2`. Nothing else is needed for the weather
@@ -276,16 +292,16 @@ that:
 bun run demo-data    # watering rota, expenses and albums; refuses a non-local DB
 ```
 
-That also creates three demo accounts — `anna`, `nicola` and `tobias`, all with
-the password `gartenzaun` — because nothing can be entered without logging in.
-The e2e test and the screenshot script sign in as `anna`.
+That also creates three demo accounts — `anna`, `nicola` and `tobias`, each
+under `<name>@example.com` — because nothing can be entered without one. The
+e2e test and the screenshot script act as `anna@example.com`. To see the app as
+a guest, set `DEV_USER_EMAIL` to an address that has no account.
 
-For a real account, skip the seed and issue a setup link instead:
+For a real account, skip the seed:
 
 ```bash
-bun run create-user nicola "Nicola"
-# prints http://localhost:3000/setup?token=... -- open it and pick a password
-bun run create-user nicola --reset    # same thing when somebody forgets
+bun run create-user nicola "Nicola" nicola@example.ch
+bun run create-user nicola --email nicola@example.com   # change the address
 ```
 
 Run the two halves in two terminals:
@@ -298,7 +314,7 @@ cd frontend && bun run dev   # Vite on :5173, proxies /api to :3000
 Open http://localhost:5173. In production there is no Vite — the Bun server
 serves `frontend/dist` and the API from the same port.
 
-Other scripts: `bun run typecheck` at the root, `bun run lint` and
+Other scripts: `bun run typecheck` and `bun run test` at the root, `bun run lint` and
 `bun run build` inside `frontend/`, and `bun run screenshots` to regenerate the
 images in this README (it needs the app running).
 
@@ -309,17 +325,15 @@ images in this README (it needs the app running).
 <details>
 <summary>API endpoints</summary>
 
-Every `GET` is public. Everything that writes needs a session cookie and
-answers `401` without one — the rule lives in one place, `server/app.ts`, and is
-keyed on the method rather than on each route.
+Every request needs a valid Cloudflare Access token and answers `403` without
+one — that goes for the frontend and the photos under `/uploads` too. With one,
+every `GET` is open; everything that writes needs an account behind the token's
+address and answers `401` otherwise. Both rules live in one place,
+`server/app.ts`, and the second is keyed on the method rather than on each route.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| `GET` | `/api/auth/me` | the signed-in user, or `null` — never a 401 |
-| `POST` | `/api/auth/login` | username and password, sets the session cookie |
-| `POST` | `/api/auth/logout` | drops the session |
-| `POST` | `/api/auth/setup/check` | is this setup link still good, and whose is it |
-| `POST` | `/api/auth/setup` | choose a password, consumes the link, signs in |
+| `GET` | `/api/auth/me` | the account behind the token, or `null` for a guest, and the address — never a 401 |
 | `GET` | `/api/water-plants` | all watering entries, newest date first |
 | `POST` | `/api/water-plants` | sign up for a day |
 | `GET` | `/api/water-plants/next-free-date` | first unclaimed day, and how far away it is |

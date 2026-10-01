@@ -1,4 +1,4 @@
-import { api } from '@/lib/api'
+import { api, apiFetch } from '@/lib/api'
 
 /** Built from the storage key, so it never changes for a given photo. */
 export function photoUrl(storageKey: string, variant: 'thumb' | 'display' = 'thumb') {
@@ -219,7 +219,7 @@ export async function uploadPhotos({ files, caption, takenAt, albumId }: UploadI
     if (takenAt) formData.append('takenAt', takenAt)
     if (albumId) formData.append('albumId', String(albumId))
 
-    const response = await fetch('/api/photos', { method: 'POST', body: formData })
+    const response = await apiFetch('/api/photos', { method: 'POST', body: formData })
     const data = (await readJson(response)) as Partial<UploadResult> & { error?: string; detail?: string }
 
     if (!response.ok && !data.photos?.length) {

@@ -1,5 +1,4 @@
 import type { ReactNode } from 'react'
-import { Link } from '@tanstack/react-router'
 
 import { useSession } from '@/lib/auth'
 import { cn } from '@/lib/utils'
@@ -24,9 +23,12 @@ export function MemberOnly({ children }: { children: ReactNode }) {
 /**
  * Says why the buttons on this page are greyed out. Renders nothing while the
  * session is still loading, so it does not flash at a member on every reload.
+ *
+ * It names the address, because the usual reason a gardener ends up here is
+ * having signed in with a different one than their account is under.
  */
 export function ReadOnlyNotice({ className }: { className?: string }) {
-    const { user, isPending } = useSession()
+    const { user, email, isPending } = useSession()
 
     if (isPending || user) {
         return null
@@ -34,11 +36,8 @@ export function ReadOnlyNotice({ className }: { className?: string }) {
 
     return (
         <p className={cn('px-1 text-xs text-muted-foreground', className)}>
-            Nur zum Anschauen.{' '}
-            <Link to="/login" className="underline underline-offset-2">
-                Anmelden
-            </Link>{' '}
-            zum Eintragen.
+            Nur zum Anschauen. Zum Eintragen braucht{' '}
+            <span className="break-words">{email ?? 'diese Adresse'}</span> ein Konto.
         </p>
     )
 }

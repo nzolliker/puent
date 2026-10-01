@@ -26,13 +26,12 @@ declare module '@tanstack/react-router' {
 
 const queryClient = new QueryClient()
 
-// Reading never 401s, so this only fires on a write without a session -- almost
-// always one that expired while the tab sat open. Re-read the session so the
-// write buttons drop back to read-only, and offer the login rather than the
-// bare "Network response was not ok" the fetchers would otherwise throw.
+// Reading never 401s, so this only fires on a write by somebody who is not a
+// member -- almost always an account that was removed while the tab sat open.
+// Re-read the session so the write buttons drop back to read-only and the
+// notice explaining why appears.
 onUnauthorized(() => {
   queryClient.invalidateQueries({ queryKey: sessionQueryKey })
-  router.navigate({ to: '/login' })
 })
 
 createRoot(document.getElementById('root')!).render(

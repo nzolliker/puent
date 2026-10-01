@@ -6,8 +6,14 @@ import { photosRoutes } from "./routes/photos";
 import { albumsRoutes } from "./routes/albums";
 import { todosRoutes } from "./routes/todos";
 import { authRoutes } from "./routes/auth";
-import { loadUser, requireAuth, type AppEnv } from "./lib/auth";
+import {
+  loadUser,
+  requireAccess,
+  requireAuth,
+  type AppEnv,
+} from "./lib/auth";
 import { serveStatic } from "hono/bun";
+import { csrf } from "hono/csrf";
 import { createReadStream } from "node:fs";
 import { stat } from "node:fs/promises";
 import { Readable } from "node:stream";
@@ -17,20 +23,37 @@ const app = new Hono<AppEnv>();
 
 app.use(logger());
 
+// Hono matches in registration order, so everything in this block has to be
+// registered before the routes below or it never runs.
+
+// First, and on the app rather than on /api: the photos and the frontend are
+// behind it as well.
+app.use("*", requireAccess);
+
+// Who somebody is now rides on a cookie Cloudflare sets, which the browser
+// attaches to cross-site requests too. JSON requests are covered by the
+// preflight; the photo upload is multipart/form-data and is not.
+//
+// The origin is compared by host only: the tunnel hands requests over as plain
+// HTTP, so the scheme in `c.req.url` never matches the `https://` the browser
+// put in Origin.
+app.use(
+  "*",
+  csrf({
+    origin: (origin, c) => URL.parse(origin)?.host === c.req.header("host"),
+  }),
+);
+
 const api = app.basePath("/api");
 
-// Hono matches in registration order, so both of these have to be registered
-// before the routes below or they never run.
 api.use("*", loadUser);
 
-// Looking is open to anyone who can reach the app; changing anything needs a
-// session. The rule is on the method rather than on each route, so a new POST
+// Looking is open to everyone Access lets in; changing anything needs an
+// account. The rule is on the method rather than on each route, so a new POST
 // is protected the day it is written instead of the day someone remembers to
-// guard it. The exemptions are reads and the login routes themselves.
+// guard it.
 api.use("*", async (c, next) =>
-  c.req.method === "GET" || c.req.path.startsWith("/api/auth/")
-    ? next()
-    : requireAuth(c, next),
+  c.req.method === "GET" ? next() : requireAuth(c, next),
 );
 
 const authApi = api.route("/auth", authRoutes);

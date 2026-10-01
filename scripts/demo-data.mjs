@@ -14,9 +14,9 @@
  * localhost. Photos are left alone -- their rows point at files in uploads/
  * that this script cannot invent.
  *
- * It also creates the demo accounts below, because writing anything needs a
- * login now. Existing accounts are updated rather than deleted, so this never
- * takes a real gardener's password away.
+ * It also creates the demo accounts below, because writing anything needs an
+ * account. Existing accounts are updated rather than deleted, so an account
+ * made by hand survives a re-run.
  *
  * weatherDays is a cache of MeteoSchweiz data rather than content, and it is
  * seeded only so the rain colours are the same every time the screenshots are
@@ -151,36 +151,37 @@ const RAIN_FORECAST = [
 const CAPTIONS = ['Salat und Kabis', 'Kohlrabi', 'Ernte']
 
 /**
- * The accounts the screenshot and e2e scripts sign in with. The display names
- * match the `created_by` values above on purpose: the expenses can then be
- * joined back onto a real account, which is what the login is for.
+ * The accounts the screenshot and e2e scripts act as. The display names match
+ * the `created_by` values above on purpose: the expenses can then be joined
+ * back onto a real account, which is what the accounts are for.
+ *
+ * Nobody signs in locally. With AUTH_DEV_BYPASS=true the server takes the
+ * address from the `x-dev-email` header, or from DEV_USER_EMAIL, and one of
+ * the addresses below is what makes that request a member.
  *
  * The watering rows are deliberately left unattached. They stand in for the
- * season that predates the login, and they are what keeps the "name kept
+ * season that predates the accounts, and they are what keeps the "name kept
  * alongside user_id" path honest -- the calendar still has to render them.
  */
 const DEMO_USERS = [
-  ['anna', 'Anna Brunner'],
-  ['nicola', 'Nicola Zolliker'],
-  ['tobias', 'Tobias Meier'],
+  ['anna', 'Anna Brunner', 'anna@example.com'],
+  ['nicola', 'Nicola Zolliker', 'nicola@example.com'],
+  ['tobias', 'Tobias Meier', 'tobias@example.com'],
 ]
-
-const DEMO_PASSWORD = process.env.DEMO_PASSWORD ?? 'gartenzaun'
 
 const db = await mysql.createConnection(url)
 
 try {
   // Upsert rather than replace: a local database may also hold an account that
   // was created by hand, and this script has no business resetting it.
-  const passwordHash = await Bun.password.hash(DEMO_PASSWORD)
-  for (const [username, name] of DEMO_USERS) {
+  for (const [username, name, email] of DEMO_USERS) {
     await db.query(
-      'INSERT INTO `users` (`username`, `name`, `password_hash`) VALUES (?, ?, ?) ' +
-        'ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `password_hash` = VALUES(`password_hash`)',
-      [username, name, passwordHash],
+      'INSERT INTO `users` (`username`, `name`, `email`) VALUES (?, ?, ?) ' +
+        'ON DUPLICATE KEY UPDATE `name` = VALUES(`name`), `email` = VALUES(`email`)',
+      [username, name, email],
     )
   }
-  console.log(`  users        ${DEMO_USERS.length} demo accounts, password "${DEMO_PASSWORD}"`)
+  console.log(`  users        ${DEMO_USERS.length} demo accounts, <username>@example.com`)
 
   await db.query('DELETE FROM `waterPlants`')
   const water = [...WATER_WINDOW, ...WATER_HISTORY]
