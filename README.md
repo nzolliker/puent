@@ -108,16 +108,16 @@ change instead of quietly going stale.
 
 The honest list, because most of it is visible in the screenshots above:
 
-- **No HTTPS.** The Pi serves plain HTTP on the LAN, so the session cookie
-  cannot carry `Secure` — anything on the same network can read it off the wire.
-  Fine for a home network of people I know, and the reason the app does not
-  leave it. `COOKIE_SECURE=true` is already wired up for the day a reverse proxy
-  terminates TLS in front of it.
+- **Two logins.** The app is reachable from outside through a Cloudflare Tunnel,
+  and Cloudflare Access only lets listed e-mail addresses through. Behind that
+  the app still asks for its own username and password, because that is how it
+  knows whose name goes on a watering day. One sign-in should be enough.
 - **The guest gate is a courtesy, not a wall.** It is a flag in the browser, and
-  the read endpoints answer without a session either way, so anyone on the LAN
-  who knows a URL can still `curl` the data. What it buys is a front door that
-  explains itself. Every *write* is refused by the server independently of it,
-  which is the half that actually holds.
+  the read endpoints answer without a session either way. The wall is Cloudflare
+  Access in front of the app: whoever gets past it can read everything, and the
+  app itself would hand the data to anyone who reached port 3000 directly, which
+  is why that port is bound to loopback. Every *write* is refused by the server
+  independently of all that.
 - **The UI language is inconsistent.** The nav and most screens are German, but
   the expenses table is still English, one button says "Submit", and the calendar
   header shows English weekday abbreviations. That screen is the oldest code in
@@ -219,10 +219,13 @@ First run needs the browsers once: `bunx playwright install webkit chromium`.
 
 ## Deployment
 
-The app runs on a Raspberry Pi as a two-service Docker Compose stack: `app` (the
-Bun server, serving the built frontend and the API) and `mysql` (with its data in
-a named volume). Deploying is push, pull on the Pi, rebuild the image, restart,
-and run migrations if the schema moved.
+The app runs on a Raspberry Pi as a three-service Docker Compose stack: `app`
+(the Bun server, serving the built frontend and the API), `mysql` (with its data
+in a named volume) and `cloudflared`, which connects the app to a Cloudflare
+Tunnel so it can be reached from outside without opening a port on the router.
+Cloudflare Access sits in front and only lets listed e-mail addresses through.
+Deploying is push, pull on the Pi, rebuild the image, restart, and run
+migrations if the schema moved.
 
 The full runbook — environment separation, volumes, migrations against
 production, recovery — is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
@@ -231,8 +234,8 @@ production, recovery — is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 - **Plant & harvest logs** — what went into which bed and when, and what came
   back out. The part that makes the app useful next year, not just this week.
-- **HTTPS** — a reverse proxy in front of the Pi, so the session cookie can be
-  `Secure` and the app could leave the home network.
+- **One sign-in** — take the identity from Cloudflare Access instead of asking
+  for a second password, and refuse every request that did not come through it.
 - **Per-person expense split** — who owes whom, now that an expense belongs to
   an account rather than to a typed-in name.
 

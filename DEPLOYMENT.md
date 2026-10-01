@@ -51,10 +51,12 @@ The point of this setup is to keep development and production isolated while sti
 
 ## Production Architecture
 
-The Raspberry Pi runs one Docker Compose stack with two services:
+The Raspberry Pi runs one Docker Compose stack with three services:
 
 - `app`: the Bun server, which serves the built frontend and the API
 - `mysql`: the production MySQL database
+- `cloudflared`: the Cloudflare Tunnel connector, the only way in from outside
+  (see [Access From Outside](#access-from-outside))
 
 Conceptually:
 
@@ -161,8 +163,9 @@ It contains values such as:
 - `DATABASE_URL`
 - `UPLOAD_DIR=/app/uploads`
 - `RAIN_THRESHOLD_MM=2` (optional)
-- `APP_URL=http://<pi-host>:3000`
-- `COOKIE_SECURE=false`
+- `APP_URL=https://<your-hostname>`
+- `COOKIE_SECURE=true`
+- `TUNNEL_TOKEN=<token from the Cloudflare dashboard>`
 
 `UPLOAD_DIR` has to be set here because `docker-compose.yml` lists the app's
 environment variables explicitly rather than passing the whole file through.
@@ -171,12 +174,18 @@ It must point at the mount path of the `uploads` volume. The same applies to
 adding them to the `app.environment:` block, silently does nothing.
 
 `APP_URL` is only used to build the setup links `bun run create-user` prints,
-so it has to be an address the garden group's phones can actually open.
+so it has to be the public hostname, the one address the garden group's phones
+can open.
 
-`COOKIE_SECURE` stays `false` as long as the Pi serves plain HTTP. A `Secure`
-cookie is never sent over HTTP, so setting it to `true` today would mean nobody
-could stay logged in. Set it to `true` on the day a reverse proxy terminates TLS
-in front of the app.
+`COOKIE_SECURE` is `true` because the browser only reaches the app over the
+HTTPS that Cloudflare terminates. A `Secure` cookie is never sent over plain
+HTTP, so with the tunnel down nobody can log in on `http://localhost:3000`
+either; set it back to `false` only if you run the stack without the tunnel.
+
+`TUNNEL_TOKEN` is what lets `cloudflared` attach to the tunnel. Treat it like a
+password: whoever has it can serve the public hostname from their own machine.
+If it leaks, rotate it in the dashboard (Networks → Tunnels → the tunnel →
+refresh token) and update this file.
 
 `RAIN_THRESHOLD_MM` is how many millimetres of rain make a day count as a rain
 day in the Giess-Plan. It can be left out — `docker-compose.yml` falls back to
@@ -200,6 +209,63 @@ Tells Drizzle:
 - where the migration files are
 - that the dialect is MySQL
 - to read the target database from `DATABASE_URL`
+
+## Access From Outside
+
+Nothing on the router is opened. The app leaves the home network through a
+Cloudflare Tunnel, and Cloudflare Access decides who may reach it at all.
+
+```text
+phone ──HTTPS──> Cloudflare ──Access check──> tunnel ──> cloudflared ──HTTP──> app:3000
+```
+
+- **Tunnel.** `cloudflared` dials out from the Pi to Cloudflare and keeps that
+  connection open. The public hostname and its target (`http://app:3000`, the
+  Compose service name) are set in the dashboard under Networks → Tunnels, not
+  in this repo.
+- **Access.** A self-hosted Access application covers the same hostname. Its
+  policy is a list of e-mail addresses; anyone else is turned away by
+  Cloudflare and never reaches the Pi. People sign in with a one-time code sent
+  to their address.
+- **The app's own login** still applies behind that. Access decides who gets to
+  the login screen; the account decides whose name goes on a watering day.
+
+Two rules that keep this safe:
+
+1. The tunnel's public hostname and the Access application's hostname must be
+   identical. A tunnel hostname that Access does not cover is public to the
+   whole internet.
+2. Port 3000 stays bound to `127.0.0.1`. Published on `0.0.0.0`, anything on the
+   LAN could reach the app without passing Access.
+
+### Letting someone in
+
+1. Add their e-mail address to the Access policy (Zero Trust → Access →
+   Applications → the app → Policies).
+2. Create their account and send them the setup link, see [Accounts](#accounts).
+
+### Checking it
+
+From a phone on mobile data, not the home WiFi:
+
+- the hostname shows the Cloudflare sign-in page, then the app's login screen
+- an address that is not on the policy does not get in
+
+From any machine:
+
+```bash
+# 302 to <team>.cloudflareaccess.com, and no data in the body
+curl -sI https://<your-hostname>/api/expenses
+
+# refused: the port is not on the LAN
+curl -i http://<pi-ip>:3000/
+```
+
+On the Pi:
+
+```bash
+docker logs puent-cloudflared --tail 20   # "Registered tunnel connection" x4
+```
 
 ## Why `DATABASE_URL` Matters
 
@@ -264,6 +330,7 @@ What this does:
 
 - starts MySQL
 - starts the app
+- starts `cloudflared`, which connects the public hostname to the app
 - creates the network if needed
 - creates the MySQL volume if needed
 
@@ -341,12 +408,9 @@ curl -i http://localhost:3000/api/expenses
 curl -i http://localhost:3000/api/water-plants
 ```
 
-From another machine on the same network:
-
-```bash
-curl -i http://<pi-ip>:3000/
-curl -i http://<pi-ip>:3000/api/expenses
-```
+From another machine these no longer answer: port 3000 is bound to loopback,
+and the only way in is the public hostname, see
+[Access From Outside](#access-from-outside).
 
 ## Run Migrations Against Production
 
@@ -618,7 +682,8 @@ Critical:
 
 This runbook assumes:
 
-- the app is exposed on port `3000`
+- the app is published on `127.0.0.1:3000`, reachable on the Pi but not from the LAN
+- the outside world reaches it only through the Cloudflare Tunnel, behind Access
 - MySQL is published on `127.0.0.1:3306`, reachable on the Pi but not from the LAN
 - the Bun server serves static files from `frontend/dist`
 - the API lives under `/api`
@@ -629,9 +694,9 @@ This runbook assumes:
 
 This setup is intentionally simple. Later improvements could include:
 
-- removing public exposure of MySQL if not needed
-- adding a reverse proxy such as Caddy or Nginx
-- adding HTTPS
+- replacing the app's own login with the identity Cloudflare Access already
+  established, so people sign in once instead of twice
+- running the app container as a non-root user
 - adding backups for the MySQL volume
 - adding a dedicated deploy script
 - adding healthchecks and startup readiness handling
