@@ -231,8 +231,9 @@ The app runs on a Raspberry Pi as a three-service Docker Compose stack: `app`
 in a named volume) and `cloudflared`, which connects the app to a Cloudflare
 Tunnel so it can be reached from outside without opening a port on the router.
 Cloudflare Access sits in front and only lets listed e-mail addresses through.
-Deploying is push, pull on the Pi, rebuild the image, restart, and run
-migrations if the schema moved.
+Deploying is one command on the Pi, `./scripts/deploy.sh`: it checks the
+configuration, pulls, dumps the database, rebuilds the image, migrates and
+switches over, and stops at the first step that fails.
 
 The full runbook — environment separation, volumes, migrations against
 production, recovery — is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
