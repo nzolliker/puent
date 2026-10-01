@@ -8,6 +8,7 @@ import {
 } from "../db/schema/waterPlants";
 
 import { createWaterSchema, waterOverviewQuerySchema } from "../sharedTypes";
+import { defaultRainThresholdMm, getRainDays } from "../lib/weather";
 import { and, desc, gte, lte } from "drizzle-orm";
 
 // helper functions
@@ -104,7 +105,8 @@ export const waterPlantsRoutes = new Hono()
   })
 
   .get("/overview", zValidator("query", waterOverviewQuerySchema), async (c) => {
-    const { days } = c.req.valid("query");
+    const { days, thresholdMm } = c.req.valid("query");
+    const threshold = thresholdMm ?? defaultRainThresholdMm();
 
     const today = startOfToday();
     const todayKey = toDayKey(today);
@@ -147,16 +149,48 @@ export const waterPlantsRoutes = new Hono()
       }
     }
 
-    const overviewDays = windowKeys.map((dayKey) => ({
-      date: dayKey,
-      names: namesByDay.get(dayKey) ?? [],
-      isOpen: !bookedDays.has(dayKey),
-      isToday: dayKey === todayKey,
-    }));
+    const { days: rainDays } = await getRainDays();
+    const rainByDay = new Map(rainDays.map((day) => [day.date, day]));
+
+    const overviewDays = windowKeys.map((dayKey) => {
+      const rain = rainByDay.get(dayKey);
+
+      return {
+        date: dayKey,
+        names: namesByDay.get(dayKey) ?? [],
+        isOpen: !bookedDays.has(dayKey),
+        isToday: dayKey === todayKey,
+        // null rather than 0, so "no data for this day" stays distinguishable
+        // from "it was dry".
+        precipMm: rain?.precipMm ?? null,
+        isRainy: rain ? rain.precipMm >= threshold : false,
+        rainSource: rain?.source ?? null,
+      };
+    });
 
     return c.json({
       today: todayKey,
       openCount: overviewDays.filter((day) => day.isOpen).length,
+      rainThresholdMm: threshold,
       days: overviewDays,
+    });
+  })
+
+  .get("/rain", async (c) => {
+    const { days, ageSeconds } = await getRainDays();
+
+    return c.json({
+      // The default, for a client that has no opinion. The threshold is not
+      // applied here: which days count as rainy is a display decision, and
+      // making it server-side turned every adjustment of the slider into a
+      // refetch -- which unmounted the calendar legend while it was in flight.
+      thresholdMm: defaultRainThresholdMm(),
+      // How stale the cache is, rather than when it was filled: an age needs no
+      // timezone to be read correctly.
+      ageSeconds,
+      // Every day it rained at all, so the browser can re-filter at any
+      // threshold without asking again. Dry days are dropped because no
+      // threshold can ever make them rainy, which keeps this a few kilobytes.
+      rainDays: days.filter((day) => day.precipMm > 0),
     });
   });

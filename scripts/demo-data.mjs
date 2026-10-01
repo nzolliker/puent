@@ -9,9 +9,16 @@
  *
  *   bun run demo-data
  *
- * This DELETES the rows in waterPlants, expenses, todos and albums, so it refuses
+ * This DELETES the rows in waterPlants, expenses, todos, albums and weatherDays,
+ * so it refuses
  * to run against anything but a database on localhost. Photos are left alone --
  * their rows point at files in uploads/ that this script cannot invent.
+ *
+ * weatherDays is a cache of MeteoSchweiz data rather than content, and it is
+ * seeded only so the rain colours are the same every time the screenshots are
+ * taken, and so the pages can be demoed with no network. The app refreshes it
+ * from MeteoSchweiz within the hour, which replaces these values with the real
+ * ones.
  */
 import 'dotenv/config'
 import mysql from 'mysql2/promise'
@@ -101,6 +108,41 @@ const ALBUMS = [
   { name: 'Ernte', photos: 1 },
 ]
 
+/**
+ * Rainfall in millimetres, chosen so that the default threshold of 2 mm shows
+ * every state the Giess-Plan can draw: a rain day nobody took (blue, "Regen"),
+ * one that is taken (green and blue, split diagonally), and the same pair again
+ * from the forecast in a lighter blue.
+ *
+ * `measured` is how a day that is over is published; `forecast` covers today
+ * and the next seven days, which is the window the app keeps.
+ */
+const RAIN_MEASURED = [
+  ['2026-09-02', 0.0],
+  ['2026-09-08', 4.2],
+  ['2026-09-09', 6.9],
+  ['2026-09-13', 0.4],
+  ['2026-09-16', 3.5],
+  // Taken by Sofia above, so this is the diagonal in the screenshot.
+  ['2026-09-17', 6.4],
+  ['2026-09-20', 1.1],
+  ['2026-09-24', 0.0],
+  ['2026-09-26', 0.0],
+  ['2026-09-28', 0.0],
+]
+
+const RAIN_FORECAST = [
+  ['2026-09-29', 0.0],
+  ['2026-09-30', 0.6],
+  ['2026-10-01', 2.8],
+  // Taken by Mira above: the forecast diagonal.
+  ['2026-10-02', 4.0],
+  ['2026-10-03', 0.0],
+  ['2026-10-04', 0.2],
+  ['2026-10-05', 7.1],
+  ['2026-10-06', 1.4],
+]
+
 /** Describe the sample photos, applied newest first where one is missing. */
 const CAPTIONS = ['Salat und Kabis', 'Kohlrabi', 'Ernte']
 
@@ -127,6 +169,22 @@ try {
   ]
   await db.query('INSERT INTO `todos` (`title`, `completed_at`) VALUES ?', [todos])
   console.log(`  todos        ${todos.length} rows (${TODOS_OPEN.length} still open)`)
+
+  await db.query('DELETE FROM `weatherDays`')
+  const rain = [
+    ...RAIN_MEASURED.map(([date, mm]) => [date, mm, 'measured']),
+    ...RAIN_FORECAST.map(([date, mm]) => [date, mm, 'forecast']),
+  ]
+  // fetched_at is left to the column default, which is the database's own
+  // now(). Passing a JS Date here instead writes the local wall time, which
+  // MySQL then compares against a UTC now() -- the freshness age comes out
+  // negative and the app stops refreshing for as long as the offset.
+  await db.query(
+    'INSERT INTO `weatherDays` (`date`, `precip_mm`, `source`) VALUES ?',
+    [rain],
+  )
+  const rainy = rain.filter(([, mm]) => mm >= 2).length
+  console.log(`  weatherDays  ${rain.length} rows (${rainy} above the 2 mm default)`)
 
   // Photos outlive albums: the FK is ON DELETE SET NULL, so clearing the
   // albums table detaches the photos instead of deleting them.

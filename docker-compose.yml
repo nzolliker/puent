@@ -31,6 +31,10 @@ services:
       NODE_ENV: ${NODE_ENV}
       PORT: ${PORT}
       UPLOAD_DIR: ${UPLOAD_DIR}
+      # Millimetres from which a day counts as rainy in the Giess-Plan. The
+      # default is here as well as in the code, because an unset variable
+      # interpolates to "" and an empty threshold would mark every day rainy.
+      RAIN_THRESHOLD_MM: ${RAIN_THRESHOLD_MM:-2}
     volumes:
       # Uploaded photos. Without this they live in the container's writable
       # layer and every rebuild deletes them.

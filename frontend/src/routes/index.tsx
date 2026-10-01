@@ -14,6 +14,7 @@ import { api } from "@/lib/api"
 import { cn, dayKeyToDate, formatWeekday, getFirstName } from "@/lib/utils"
 import { getPhotos, photoUrl } from "@/lib/photos"
 import { getOpenTodos } from "@/lib/todos"
+import { BOOKED_DRY, RAIN_BOOKED, RAIN_OPEN, rainLabel } from "@/lib/rain"
 
 export const Route = createFileRoute('/')({
     component: Index,
@@ -46,16 +47,26 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
     const isPast = day.date < todayKey
     const names = day.names.map(getFirstName).filter(Boolean)
 
+    // isRainy already accounts for the threshold; rainSource tells measured from
+    // forecast. Both are null on a day the weather data does not cover.
+    const rainSource = day.isRainy ? day.rainSource : null
+
     const chipClasses = cn(
         'flex min-h-9 w-full flex-col items-center justify-center rounded-md border px-0.5 py-1 text-[0.625rem] leading-tight',
-        day.isOpen
-            ? 'border-dashed text-muted-foreground hover:bg-accent'
-            : 'bg-green-400 text-emerald-900',
+        rainSource
+            ? day.isOpen
+                ? RAIN_OPEN[rainSource]
+                : RAIN_BOOKED[rainSource]
+            : day.isOpen
+                ? 'border-dashed text-muted-foreground hover:bg-accent'
+                : BOOKED_DRY,
         isPast && 'opacity-60',
     )
 
+    // A taken rain day keeps the names -- the green/blue split already carries
+    // the rain, and the name is the more useful thing in a chip this size.
     const chipContent = day.isOpen ? (
-        <span>—</span>
+        <span>{rainSource ? rainLabel(rainSource) : '—'}</span>
     ) : names.length > 0 ? (
         names.map((name, index) => (
             <span key={index} className="w-full truncate text-center">
@@ -65,6 +76,8 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
     ) : (
         <span>✓</span>
     )
+
+    const rainTitle = rainSource ? `${rainLabel(rainSource)} ${day.precipMm} mm` : null
 
     return (
         <div className="flex flex-col items-center gap-1">
@@ -83,12 +96,18 @@ function DayColumn({ day, todayKey }: { day: WaterOverviewDay; todayKey: string 
                         to="/waterPlants"
                         search={{ date: day.date }}
                         className={chipClasses}
-                        title="Noch offen — eintragen"
+                        title={
+                            rainTitle
+                                ? `Noch offen — eintragen · ${rainTitle}`
+                                : 'Noch offen — eintragen'
+                        }
                     >
                         {chipContent}
                     </Link>
                 ) : (
-                    <span className={chipClasses}>{chipContent}</span>
+                    <span className={chipClasses} title={rainTitle ?? undefined}>
+                        {chipContent}
+                    </span>
                 )}
             </div>
         </div>
