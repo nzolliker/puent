@@ -18,7 +18,7 @@ services:
       # Loopback, not 0.0.0.0: the app talks to MySQL over the Compose network
       # and never uses this mapping. It is here so `mysql -u ...` and a dump
       # work when you are on the Pi, and binding it wide would put the database
-      # on the LAN next to an app that already serves plain HTTP.
+      # on the LAN for no reason.
       - "127.0.0.1:3306:3306"
 
   app:
@@ -41,8 +41,9 @@ services:
       RAIN_THRESHOLD_MM: ${RAIN_THRESHOLD_MM:-2}
       # Only the setup links `bun run create-user` prints are built from this.
       APP_URL: ${APP_URL}
-      # Leave false while the Pi serves plain HTTP: a Secure cookie would never
-      # be sent, and nobody could stay logged in. Flip it once TLS is in front.
+      # true, because the browser only ever reaches the app over the HTTPS that
+      # Cloudflare terminates. Over plain HTTP a Secure cookie is never sent,
+      # so set it to false if you run this stack without the tunnel.
       COOKIE_SECURE: ${COOKIE_SECURE}
     volumes:
       # Uploaded photos. Without this they live in the container's writable
@@ -51,7 +52,25 @@ services:
     depends_on:
       - mysql
     ports:
-      - "3000:3000"
+      # Loopback for the same reason as MySQL: cloudflared reaches the app over
+      # the Compose network as http://app:3000 and never uses this mapping. It
+      # is here so `curl localhost:3000` works on the Pi. Binding it wide would
+      # let anything on the LAN walk around Cloudflare Access.
+      - "127.0.0.1:3000:3000"
+
+  # The only way in from outside. It dials out to Cloudflare, so no port is
+  # opened on the router and none is published here. Which hostname it serves,
+  # and that it forwards to http://app:3000, is configured in the Cloudflare
+  # dashboard and not in this file.
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    container_name: puent-cloudflared
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      TUNNEL_TOKEN: ${TUNNEL_TOKEN}
+    depends_on:
+      - app
 
 volumes:
   mysql_data:

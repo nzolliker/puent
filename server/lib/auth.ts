@@ -134,9 +134,9 @@ export async function invalidateSession(token: string) {
 
 // -- cookie ------------------------------------------------------------------
 
-// Off by default, because production is plain HTTP on the LAN and a `Secure`
-// cookie would simply never be sent. Flip COOKIE_SECURE=true the day a reverse
-// proxy terminates TLS in front of this.
+// Off by default, because local development is plain HTTP and a `Secure` cookie
+// would simply never be sent. Production sets COOKIE_SECURE=true: there the
+// browser only reaches the app over the HTTPS that Cloudflare terminates.
 function cookieIsSecure() {
   return process.env.COOKIE_SECURE === "true";
 }
