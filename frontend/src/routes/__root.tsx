@@ -1,5 +1,5 @@
 import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
-import { LogOut } from 'lucide-react'
+import { Camera, CircleDollarSign, Droplets, House, ListTodo, LogOut } from 'lucide-react'
 // import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 
 import { Button } from '@/components/ui/button'
@@ -22,9 +22,9 @@ function SessionControls() {
             <span className="text-sm text-muted-foreground">
                 {user ? getFirstName(user.name) : 'Gast'}
             </span>
-            {/* Icon only: five nav links plus a name already fill a phone. A
-                guest gets it too -- signing out is how they come back in with
-                the address their account is under. */}
+            {/* Icon only, like the nav links beside it. A guest gets it too --
+                signing out is how they come back in with the address their
+                account is under. */}
             <Button
                 variant="ghost"
                 size="icon-xs"
@@ -39,27 +39,34 @@ function SessionControls() {
     )
 }
 
+const navLinks = [
+    { to: '/', label: 'Home', icon: House },
+    { to: '/waterPlants', label: 'Giessen', icon: Droplets },
+    { to: '/expenses', label: 'Ausgaben', icon: CircleDollarSign },
+    { to: '/aufgaben', label: 'Aufgaben', icon: ListTodo },
+    { to: '/fotos', label: 'Fotos', icon: Camera },
+] as const
+
 function NavBar() {
     return (
-        // Wraps rather than overflowing: the five links and a name do not fit
-        // one 390px row, and the app is used on a phone.
+        // Icons rather than words: five page names and a name did not fit one
+        // 390px row, and the app is used on a phone. Still allowed to wrap, in
+        // case a long first name pushes it over.
         <div className='p-2 flex flex-wrap items-center justify-between gap-x-4 gap-y-1 m-auto'>
-            <div className="flex flex-wrap gap-4">
-                <Link to="/" className="[&.active]:font-bold">
-                    Home
-                </Link>{' '}
-                <Link to="/waterPlants" className="[&.active]:font-bold">
-                    Giessen
-                </Link>
-                <Link to="/expenses" className="[&.active]:font-bold">
-                    Ausgaben
-                </Link>
-                <Link to="/aufgaben" className="[&.active]:font-bold">
-                    Aufgaben
-                </Link>
-                <Link to="/fotos" className="[&.active]:font-bold">
-                    Fotos
-                </Link>
+            <div className="flex flex-wrap gap-1">
+                {navLinks.map(({ to, label, icon: Icon }) => (
+                    // The label is what a screen reader and a desktop hover
+                    // get; each page repeats it in its own heading.
+                    <Link
+                        key={to}
+                        to={to}
+                        aria-label={label}
+                        title={label}
+                        className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-accent [&.active]:bg-accent [&.active]:text-foreground"
+                    >
+                        <Icon className="size-5" />
+                    </Link>
+                ))}
             </div>
             <SessionControls />
         </div>
