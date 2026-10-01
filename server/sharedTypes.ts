@@ -103,14 +103,14 @@ export const setupTokenSchema = z.object({
 
 export const setPasswordSchema = z.object({
   token: z.string().min(1),
-  password: z.string().min(8, { message: "Mindestens 8 Zeichen" }),
+  password: z.string().min(6, { message: "Mindestens 6 Zeichen" }),
 });
 
 // The confirmation field never leaves the browser, so it lives in the form
 // schema rather than the one the route validates.
 export const setPasswordFormSchema = z
   .object({
-    password: z.string().min(8, { message: "Mindestens 8 Zeichen" }),
+    password: z.string().min(6, { message: "Mindestens 6 Zeichen" }),
     confirmation: z.string(),
   })
   .refine((value) => value.password === value.confirmation, {
