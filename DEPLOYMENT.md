@@ -160,10 +160,26 @@ It contains values such as:
 - `MYSQL_ROOT_PASSWORD`
 - `DATABASE_URL`
 - `UPLOAD_DIR=/app/uploads`
+- `RAIN_THRESHOLD_MM=2` (optional)
 
 `UPLOAD_DIR` has to be set here because `docker-compose.yml` lists the app's
 environment variables explicitly rather than passing the whole file through.
 It must point at the mount path of the `uploads` volume.
+
+`RAIN_THRESHOLD_MM` is how many millimetres of rain make a day count as a rain
+day in the Giess-Plan. It can be left out — `docker-compose.yml` falls back to
+`2` — but do not set it to an empty value, which would count every day as rainy.
+
+### Outbound network
+
+The app fetches rainfall for Winterthur from MeteoSchweiz open data
+(`data.geo.admin.ch`) and caches it in the `weatherDays` table. At most two
+requests an hour, a few hundred kilobytes each.
+
+It is the only outbound call the app makes, and it is not load-bearing: if
+`data.geo.admin.ch` cannot be reached, the Giess-Plan and the dashboard serve
+the rain data already in the table, or none at all, and keep working. A failed
+refresh logs one line and is not retried for five minutes.
 
 ### `drizzle.config.ts`
 
