@@ -1,4 +1,5 @@
-import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
+import { useEffect } from 'react'
+import { createFileRoute, useNavigate } from '@tanstack/react-router'
 import { useForm } from '@tanstack/react-form'
 import type { AnyFieldApi } from '@tanstack/react-form'
 
@@ -12,7 +13,7 @@ import {
     CardHeader,
     CardTitle,
 } from '@/components/ui/card'
-import { useLogin, useSession } from '@/lib/auth'
+import { enterGuestMode, useLogin, useSession } from '@/lib/auth'
 import { loginSchema } from '@server/sharedTypes'
 
 export const Route = createFileRoute('/login')({
@@ -46,22 +47,16 @@ function Login() {
         },
     })
 
+    // Straight on rather than a card with a link in it: somebody already signed
+    // in has nothing to do on this screen.
+    useEffect(() => {
+        if (user) {
+            void navigate({ to: '/', replace: true })
+        }
+    }, [user, navigate])
+
     if (user) {
-        return (
-            <div className="mx-auto max-w-sm p-4">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Bereits angemeldet</CardTitle>
-                        <CardDescription>Angemeldet als {user.name}.</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <Link to="/" className="underline underline-offset-2">
-                            Zur Übersicht
-                        </Link>
-                    </CardContent>
-                </Card>
-            </div>
-        )
+        return null
     }
 
     return (
@@ -137,6 +132,30 @@ function Login() {
                             )}
                         />
                     </form>
+
+                    {/* The way past this screen without an account. Deliberately
+                        a quieter button than "Anmelden" -- most people who open
+                        the app are members and should not have to pick. */}
+                    <div className="mt-6 grid gap-2">
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                            <span className="h-px flex-1 bg-border" />
+                            oder
+                            <span className="h-px flex-1 bg-border" />
+                        </div>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={async () => {
+                                enterGuestMode()
+                                await navigate({ to: '/' })
+                            }}
+                        >
+                            Als Gast ansehen
+                        </Button>
+                        <p className="text-xs text-muted-foreground">
+                            Alles anschauen, nichts eintragen.
+                        </p>
+                    </div>
 
                     <p className="mt-4 text-xs text-muted-foreground">
                         Kein Konto? Die Gartengruppe verschickt einen einmaligen Link.

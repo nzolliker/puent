@@ -10,8 +10,9 @@
  *   bun run screenshots
  *
  * Most shots are of a signed-in member, because the dialogs they show are
- * members-only. The one marked `anonymous` gets its own cookie-less context,
- * so the README can also show what a visitor sees.
+ * members-only. The ones marked `as: 'guest'` and `as: 'visitor'` get their own
+ * cookie-less contexts, so the README can also show what someone who has not
+ * logged in sees and the login screen they land on first.
  *
  * Chromium, not the WebKit the e2e test uses: Safari is what the garden group
  * browses with, but Chromium is what rasterises deterministically and honours
@@ -88,10 +89,17 @@ const shots = [
   {
     file: '09-nur-lesen.webp',
     path: '/aufgaben',
-    // What someone who has not logged in sees: the list in full, the buttons
-    // out of reach.
-    anonymous: true,
+    // What a guest sees: the list in full, the buttons out of reach.
+    as: 'guest',
     ready: (page) => page.getByText(/Nur zum Anschauen/).waitFor(),
+  },
+  {
+    file: '10-anmelden.webp',
+    path: '/login',
+    // The first screen anyone meets, so it belongs in the README. Neither a
+    // cookie nor the guest flag, which is what makes the gate redirect here.
+    as: 'visitor',
+    ready: (page) => page.getByRole('button', { name: 'Als Gast ansehen' }).waitFor(),
   },
   {
     file: '06-ausgaben.webp',
@@ -168,13 +176,27 @@ async function sessionCookie() {
 // One cookie signs in every page this context opens.
 await context.addCookies([await sessionCookie()])
 
-// A second context that never logs in, for the read-only shot.
-const anonContext = await browser.newContext(contextOptions)
+// Two contexts that never log in. The guest one carries the flag the login
+// screen's button writes, which is what gets it past the gate in __root.tsx;
+// the visitor one carries nothing, so it lands on the login screen itself.
+const guestContext = await browser.newContext(contextOptions)
+await guestContext.addInitScript(() => {
+  try {
+    localStorage.setItem('puent.guest', '1')
+  } catch {
+    // Matches the app's own handling -- a browser that refuses to store it
+    // would simply bounce this context back to the login screen.
+  }
+})
+
+const visitorContext = await browser.newContext(contextOptions)
+
+const contexts = { guest: guestContext, visitor: visitorContext }
 
 console.log(`Capturing ${shots.length} shots from ${BASE}`)
 
-for (const { file, path, prepare, ready, cropTo, viewport, anonymous } of shots) {
-  const page = await (anonymous ? anonContext : context).newPage()
+for (const { file, path, prepare, ready, cropTo, viewport, as } of shots) {
+  const page = await (as ? contexts[as] : context).newPage()
   if (viewport) await page.setViewportSize(viewport)
   await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
 

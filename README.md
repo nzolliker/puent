@@ -79,8 +79,9 @@ change instead of quietly going stale.
 </table>
 
 **Accounts**
-- Anyone who can reach the app can read everything: the rota, the expenses, the
-  to-dos and the photos. Changing any of it needs a login.
+- The app opens on a login screen. Past it either by signing in, or with **Als
+  Gast ansehen** — a guest reads everything (the rota, the expenses, the to-dos
+  and the photos) and changes nothing.
 - Signing up for a day or adding an expense no longer asks who you are — the
   name comes off the session, so a row belongs to an account rather than to
   whatever was typed in the box.
@@ -88,7 +89,10 @@ change instead of quietly going stale.
   that the person opens to choose their own password; the same command issues a
   new one when somebody forgets theirs.
 
-<img src="docs/screenshots/09-nur-lesen.webp" alt="The tasks page seen without logging in: the list is readable, the buttons are disabled" width="300">
+<p>
+<img src="docs/screenshots/10-anmelden.webp" alt="The login screen with a username and password field and, below a divider, a button reading Als Gast ansehen" width="300">
+<img src="docs/screenshots/09-nur-lesen.webp" alt="The tasks page seen as a guest: the list is readable, the buttons are disabled" width="300">
+</p>
 
 **Fotos**
 - Upload several pictures at once, by file picker or drag and drop.
@@ -109,6 +113,11 @@ The honest list, because most of it is visible in the screenshots above:
   Fine for a home network of people I know, and the reason the app does not
   leave it. `COOKIE_SECURE=true` is already wired up for the day a reverse proxy
   terminates TLS in front of it.
+- **The guest gate is a courtesy, not a wall.** It is a flag in the browser, and
+  the read endpoints answer without a session either way, so anyone on the LAN
+  who knows a URL can still `curl` the data. What it buys is a front door that
+  explains itself. Every *write* is refused by the server independently of it,
+  which is the half that actually holds.
 - **The UI language is inconsistent.** The nav and most screens are German, but
   the expenses table is still English, one button says "Submit", and the calendar
   header shows English weekday abbreviations. That screen is the oldest code in
