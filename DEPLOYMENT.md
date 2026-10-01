@@ -1,43 +1,53 @@
 # Deployment Runbook
 
-## deployment quick description:
+## Deploying A Change
 
-1. On your MacBook, commit and push the new code:
+Once the change is merged into `main` on GitHub, on the Pi:
 
-`
-git add .
-git commit -m "Add new feature"
-git push
-`
+```bash
+cd /home/nzolliker/repos/puent
+./scripts/deploy.sh
+```
 
-2. SSH into the Pi and go to the production checkout:
+Or from the MacBook in one line:
 
-3. Pull the new version:
+```bash
+ssh nzolliker@<pi-host> 'cd ~/repos/puent && ./scripts/deploy.sh'
+```
 
-`
-git status
-git pull
-`
+The script stops at the first step that fails and says which. In order, it:
 
-4. Rebuild the app image from the updated code:
+1. **Checks the configuration, before it changes anything.** `.env.production`
+   has to exist and hold `DATABASE_URL`, `CF_ACCESS_TEAM_DOMAIN`,
+   `CF_ACCESS_AUD` and `TUNNEL_TOKEN`; `AUTH_DEV_BYPASS` must not be in it; the
+   checkout has to be on `main` with no modified tracked files.
+2. **Pulls `main`** and lists the commits that came in.
+3. **Dumps the database** to `~/puent-backups/puent-<timestamp>.sql.gz` and keeps
+   the newest ten. Photos are not part of it, see
+   [Persistent Data Warning](#persistent-data-warning).
+4. **Builds the app image.**
+5. **Runs the migrations with the new image, while the old version is still
+   serving.** If a migration fails, the deploy stops here and the old version
+   keeps running.
+6. **Switches over** with `docker compose up -d` for the whole stack, so a change
+   to `docker-compose.yml` is picked up too.
+7. **Checks the result**: the app answers `403` on `localhost:3000` (up, and
+   refusing a request without an Access token) and `cloudflared` is running. A
+   `200` fails the check on purpose — it would mean the app serves everyone.
+8. **Removes superseded images**, which otherwise pile up on the SD card.
 
-`docker compose --env-file .env.production build app`
+Running it again without a new commit is fine: it rebuilds and restarts, which
+is also how a change to `.env.production` takes effect.
 
-5. Recreate/start the app with the new image:
+To restore a dump:
 
-`docker compose --env-file .env.production up -d app`
+```bash
+gunzip -c ~/puent-backups/puent-<timestamp>.sql.gz | \
+  docker exec -i puent-mysql sh -c 'MYSQL_PWD="$MYSQL_ROOT_PASSWORD" exec mysql -uroot "$MYSQL_DATABASE"'
+```
 
-6. If the feature includes DB schema changes, run migrations:
-
-`docker exec -it puent-app bunx drizzle-kit migrate`
-
-7. Verify the deployment:
-
-`
-docker compose --env-file .env.production ps
-docker logs puent-app --tail 100
-curl -i http://localhost:3000/    # 403 is right: up, and guarded
-`
+The sections below describe the same steps by hand. They are what to fall back
+on when the script stops, and the explanation of what it does.
 
 ## Goal
 
@@ -572,20 +582,24 @@ curl -i http://localhost:3000/    # 403 is right: up, and guarded
 
 ## Recommended Deployment Order
 
-When shipping a new version, use this order:
+This is the order `scripts/deploy.sh` uses, and the one to follow by hand:
 
 1. `git pull`
 2. `docker compose --env-file .env.production build app`
-3. `docker compose --env-file .env.production up -d app`
-4. `docker exec -it puent-app bunx drizzle-kit migrate`
+3. `docker compose --env-file .env.production run --rm -T app bunx drizzle-kit migrate`
+4. `docker compose --env-file .env.production up -d`
 5. verify with logs and `curl`
 
-This order works well for this project because:
+Migrating comes before switching over, with a one-off container from the image
+that was just built:
 
-- the code update happens first
-- the new container is created from the updated code
-- migrations are run against the correct production DB
-- the final verification is explicit
+- a migration that fails stops the deploy while the old version is still
+  serving, instead of leaving new code on a half-migrated database
+- the new code never runs against a schema it does not know yet
+
+The price is the few seconds in which the old code runs against the new schema.
+That is harmless for a migration that only adds things, and worth a thought for
+one that drops a column the old code still reads.
 
 ## One-Time Migration: Project Moved To Repo Root
 
@@ -671,7 +685,12 @@ But:
 can destroy the production database **and every uploaded photo** if used
 carelessly.
 
-Neither volume is backed up yet. Photos are the one kind of data here that
+The database is dumped to `~/puent-backups` by every run of `scripts/deploy.sh`,
+which keeps the newest ten. That is a safety net for a migration, not a backup:
+it sits on the same SD card as the database, and nothing takes one between
+deploys.
+
+The photos are not backed up at all. They are the one kind of data here that
 cannot be recreated by re-entering it, so a copy is worth taking:
 
 ```bash
@@ -711,7 +730,7 @@ This runbook assumes:
 This setup is intentionally simple. Later improvements could include:
 
 - running the app container as a non-root user
-- adding backups for the MySQL volume
-- adding a dedicated deploy script
+- backing up the database and the photos to somewhere that is not the Pi
+- deploying automatically when `main` changes
 - adding healthchecks and startup readiness handling
 
