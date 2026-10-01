@@ -45,6 +45,9 @@ change instead of quietly going stale.
 - Clicking an open day jumps to the calendar with that date preselected and the
   signup dialog already open.
 - Signing up is a name and a date — one row in the `waterPlants` table.
+- A member can take their own day back: it carries a ring in the calendar,
+  and selecting it offers *Austragen* instead of *Einschreiben*. Nobody can
+  remove somebody else's.
 - **Rain is on the calendar.** A day it rained is blue and shows how much —
   `4.9 mm` — where a name would go; if somebody had already signed up, the day
   keeps their name and is split diagonally, green over blue. Today and the next
@@ -337,6 +340,7 @@ address and answers `401` otherwise. Both rules live in one place,
 | `GET` | `/api/auth/me` | the account behind the token, or `null` for a guest, and the address — never a 401 |
 | `GET` | `/api/water-plants` | all watering entries, newest date first |
 | `POST` | `/api/water-plants` | sign up for a day |
+| `DELETE` | `/api/water-plants/:id` | take a day back — your own only, anything else is a 403 |
 | `GET` | `/api/water-plants/next-free-date` | first unclaimed day, and how far away it is |
 | `GET` | `/api/water-plants/overview?days=3` | day-by-day window around today |
 | `GET` | `/api/water-plants/rain` | every day it rained: measured for the past, forecast for the next seven |

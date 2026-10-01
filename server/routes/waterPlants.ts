@@ -9,7 +9,7 @@ import {
 
 import { createWaterSchema, waterOverviewQuerySchema } from "../sharedTypes";
 import { defaultRainThresholdMm, getRainDays } from "../lib/weather";
-import { and, desc, gte, lte } from "drizzle-orm";
+import { and, desc, eq, gte, lte } from "drizzle-orm";
 import type { AppEnv } from "../lib/auth";
 
 // helper functions
@@ -83,6 +83,38 @@ export const waterPlantsRoutes = new Hono<AppEnv>()
 
     c.status(201);
     return c.json(result);
+  })
+
+  // Only the member who enrolled can take the day back. The rows that predate
+  // the login have no `userId`, so they match nobody and stay where they are.
+  .delete("/:id{[0-9]+}", async (c) => {
+    const id = Number.parseInt(c.req.param("id"));
+    // Non-null: the mutation guard in app.ts has already run.
+    const user = c.get("user")!;
+
+    const row = await db
+      .select({ userId: waterPlantsTable.userId })
+      .from(waterPlantsTable)
+      .where(eq(waterPlantsTable.id, id))
+      .then((res) => res[0]);
+
+    if (!row) {
+      return c.notFound();
+    }
+
+    if (row.userId !== user.id) {
+      return c.json({ error: "Nur der eigene Eintrag kann gelöscht werden." }, 403);
+    }
+
+    // The owner is in the statement as well, so the rule does not rest on the
+    // check above alone.
+    await db
+      .delete(waterPlantsTable)
+      .where(
+        and(eq(waterPlantsTable.id, id), eq(waterPlantsTable.userId, user.id)),
+      );
+
+    return c.json({ id: id });
   })
 
   .get("/next-free-date", async (c) => {

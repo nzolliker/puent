@@ -25,7 +25,7 @@ import {
     rainLabel,
 } from '@/lib/rain'
 import { ReadOnlyNotice } from '@/components/access'
-import { useCanEdit } from '@/lib/auth'
+import { useCanEdit, useSession } from '@/lib/auth'
 import { createWaterFormSchema } from '@server/sharedTypes'
 
 const dayKeyPattern = /^\d{4}-\d{2}-\d{2}$/
@@ -79,9 +79,20 @@ type WaterDialogProps = {
 }
 
 type WaterBooking = {
+    id: number
     date: Date
     dayKey: string
     name: string
+    /** Null on the rows that predate the login -- those belong to nobody. */
+    userId: number | null
+}
+
+type RemoveDialogProps = {
+    open: boolean
+    onOpenChange: (open: boolean) => void
+    pickedDate: Date
+    isPending: boolean
+    onConfirm: () => void
 }
 
 function formatPickedDate(value: Date) {
@@ -113,15 +124,26 @@ async function getAllDates() {
     }
 
     const data = await response.json()
-    return data.waterPlants.map(({ date, name }) => {
+    return data.waterPlants.map(({ id, date, name, userId }) => {
         const parsedDate = new Date(date)
 
         return {
+            id,
             date: parsedDate,
             dayKey: toLocalDayKey(parsedDate),
             name: name ?? '',
+            userId,
         } satisfies WaterBooking
     })
+}
+
+// The server checks that the entry is the caller's own; this only sends the id.
+async function handleRemove(id: number) {
+    const res = await api['water-plants'][':id{[0-9]+}'].$delete({ param: { id: String(id) } })
+
+    if (!res.ok) {
+        throw new Error('Network response was not ok')
+    }
 }
 
 function useWaterForm(
@@ -179,6 +201,34 @@ function WaterDialog({ open, onOpenChange, pickedDate, form }: WaterDialogProps)
                             </Button>
                         )}
                     />
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    )
+}
+
+function RemoveDialog({ open, onOpenChange, pickedDate, isPending, onConfirm }: RemoveDialogProps) {
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent className="top-[10dvh] bottom-auto max-h-[calc(100dvh-12dvh)] translate-y-0 gap-0 overflow-y-auto p-0 sm:top-[50%] sm:max-w-sm sm:translate-y-[-50%]">
+                <DialogHeader className="px-4 pt-5 sm:px-6 sm:pt-6">
+                    <DialogTitle>Eintrag löschen</DialogTitle>
+                    <DialogDescription>
+                        Möchtest du dich am {formatPickedDate(pickedDate)} wieder austragen?
+                    </DialogDescription>
+                </DialogHeader>
+                <DialogFooter className="sticky bottom-0 mt-4 border-t bg-background px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
+                    <DialogClose asChild>
+                        <Button variant="outline">Abbrechen</Button>
+                    </DialogClose>
+                    <Button
+                        type="button"
+                        variant="destructive"
+                        disabled={isPending}
+                        onClick={onConfirm}
+                    >
+                        {isPending ? '...' : 'Austragen'}
+                    </Button>
                 </DialogFooter>
             </DialogContent>
         </Dialog>
@@ -269,7 +319,11 @@ function Giessen() {
     // Arriving with `?date=` (from the dashboard card) preselects that day and opens
     // the dialog straight away.
     const [dialogOpen, setDialogOpen] = useState(Boolean(dateParam))
+    // Its own flag rather than a second meaning for dialogOpen: a `?date=` link
+    // must never open straight into a delete confirmation.
+    const [removeOpen, setRemoveOpen] = useState(false)
     const canEdit = useCanEdit()
+    const { user } = useSession()
     const navigate = Route.useNavigate()
     const queryClient = useQueryClient()
     const { error, data } = useQuery({
@@ -306,6 +360,16 @@ function Giessen() {
         await insertWaterDateMutation.mutateAsync(value)
     }, dateParam ? dayKeyToDate(dateParam) : null)
 
+    const removeWaterDateMutation = useMutation({
+        mutationFn: handleRemove,
+        onSuccess: async () => {
+            await queryClient.invalidateQueries({ queryKey: ['get-all-water-dates'] })
+            await queryClient.invalidateQueries({ queryKey: ['get-water-overview'] })
+            form.setFieldValue('date', null)
+            setRemoveOpen(false)
+        },
+    })
+
     // Drop the date once the dialog is gone, so a reload does not reopen it --
     // but keep the rain threshold, which is not the dialog's business.
     function closeDialog() {
@@ -332,6 +396,17 @@ function Giessen() {
 
     const bookedDates = data?.map((booking) => booking.date) ?? []
     const bookedNamesByDay = new Map(data?.map((booking) => [booking.dayKey, booking.name]) ?? [])
+    // The member's own entries, which are the ones they may take back.
+    const ownBookingByDay = new Map(
+        user
+            ? (data ?? [])
+                  .filter((booking) => booking.userId === user.id)
+                  .map((booking) => [booking.dayKey, booking])
+            : [],
+    )
+    // An own day stays selectable -- selecting it is how it gets removed.
+    const takenByOthers =
+        data?.filter((booking) => !ownBookingByDay.has(booking.dayKey)).map((booking) => booking.date) ?? []
     // The threshold in force: the URL overrides the server's default.
     const appliedThreshold = rainParam ?? rain?.thresholdMm
     const rainByDay = new Map(
@@ -356,7 +431,7 @@ function Giessen() {
                             defaultMonth={field.state.value ?? new Date()}
                             selected={field.state.value ?? undefined}
                             onSelect={(date) => field.handleChange(date ?? null)}
-                            disabled={bookedDates}
+                            disabled={takenByOthers}
                             // Rain is read from rainByDay inside DayButton rather than
                             // registered as a modifier, so it cannot change which days
                             // are selectable.
@@ -378,6 +453,7 @@ function Giessen() {
                                     const firstName = bookedName ? getFirstName(bookedName) : null
                                     const rainDay = rainByDay.get(dayKey)
                                     const isBooked = Boolean(modifiers.booked)
+                                    const isOwn = ownBookingByDay.has(dayKey)
 
                                     const background = rainDay
                                         ? (isBooked ? RAIN_BOOKED : RAIN_OPEN)[rainDay.source]
@@ -397,6 +473,8 @@ function Giessen() {
                                             className={cn(
                                                 background,
                                                 (isBooked || rainDay) && 'relative px-1 py-1 text-center',
+                                                // Marks the green days a member can pick: their own.
+                                                isOwn && 'ring-2 ring-inset ring-emerald-700',
                                                 // CalendarDayButton sets [&>span]:text-xs, which outranks
                                                 // the label's own size and leaves "Regen?" no room. Target
                                                 // the label alone -- the day number keeps its size.
@@ -445,25 +523,50 @@ function Giessen() {
                         const pickedIsBooked = Boolean(
                             pickedDate && bookedNamesByDay.has(toLocalDayKey(pickedDate)),
                         )
+                        const ownBooking = pickedDate
+                            ? ownBookingByDay.get(toLocalDayKey(pickedDate))
+                            : undefined
 
                         return (
                             <>
                                 <p className="mt-3 text-sm text-muted-foreground">
                                     {!pickedDate
                                         ? 'Bitte zuerst ein Datum auswählen'
-                                        : pickedIsBooked
-                                            ? `${formatPickedDate(pickedDate)} ist bereits vergeben`
-                                            : `Ausgewählt: ${formatPickedDate(pickedDate)}`}
+                                        : ownBooking
+                                            ? `Du giesst am ${formatPickedDate(pickedDate)}`
+                                            : pickedIsBooked
+                                                ? `${formatPickedDate(pickedDate)} ist bereits vergeben`
+                                                : `Ausgewählt: ${formatPickedDate(pickedDate)}`}
                                 </p>
-                                <Button
-                                    className="mt-3"
-                                    type="button"
-                                    disabled={!pickedDate || pickedIsBooked || !canEdit}
-                                    onClick={() => setDialogOpen(true)}
-                                >
-                                    Einschreiben
-                                </Button>
+                                {ownBooking ? (
+                                    <Button
+                                        className="mt-3"
+                                        type="button"
+                                        variant="destructive"
+                                        onClick={() => setRemoveOpen(true)}
+                                    >
+                                        Austragen
+                                    </Button>
+                                ) : (
+                                    <Button
+                                        className="mt-3"
+                                        type="button"
+                                        disabled={!pickedDate || pickedIsBooked || !canEdit}
+                                        onClick={() => setDialogOpen(true)}
+                                    >
+                                        Einschreiben
+                                    </Button>
+                                )}
                                 <ReadOnlyNotice className="mt-2 text-center" />
+                                {pickedDate && ownBooking && (
+                                    <RemoveDialog
+                                        open={removeOpen}
+                                        onOpenChange={setRemoveOpen}
+                                        pickedDate={pickedDate}
+                                        isPending={removeWaterDateMutation.isPending}
+                                        onConfirm={() => removeWaterDateMutation.mutate(ownBooking.id)}
+                                    />
+                                )}
                             </>
                         )
                     }}
