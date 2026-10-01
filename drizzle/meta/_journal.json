@@ -71,6 +71,13 @@
       "when": 1790710816650,
       "tag": "0009_weather_days",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "5",
+      "when": 1790850589882,
+      "tag": "0010_users_and_sessions",
+      "breakpoints": true
     }
   ]
 }
