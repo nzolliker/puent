@@ -126,11 +126,13 @@ export const createPlantingSchema = z.object({
   note: z.string().trim().max(1000).nullish(),
   plantedAt: dayKey,
   removedAt: dayKey.nullish(),
+  readyAt: dayKey.nullish(),
   photoId: z.number().int().positive().nullish(),
 });
 
 // Clearing a bed away is this call with only `removedAt`; putting a planting
-// back is the same call with `removedAt: null`. A planting never changes beds.
+// back is the same call with `removedAt: null`. Marking it ready to harvest is
+// `readyAt`, the same way. A planting never changes beds.
 export const updatePlantingSchema = createPlantingSchema
   .omit({ bedKey: true })
   .partial();

@@ -29,6 +29,8 @@ export type PlantingInput = {
     plantedAt: string
     /** Null means it is still growing. */
     removedAt: string | null
+    /** Since when it can be harvested. Left out, it stays as it is. */
+    readyAt?: string | null
     photoId: number | null
 }
 
@@ -69,35 +71,53 @@ export async function deletePlanting(id: number) {
 }
 
 /**
- * Written out in pairs because Tailwind scans source text -- a class built by
- * string concatenation at runtime would never make it into the stylesheet.
- * `fill` is for the plan's cells, `dot` for the list beside it.
+ * Whether a planting can be picked today. One that has been cleared away
+ * keeps the day it ripened, but there is nothing left of it to pick.
  */
-const CROP_COLOURS = [
-    { fill: 'fill-emerald-600', dot: 'bg-emerald-600' },
-    { fill: 'fill-amber-600', dot: 'bg-amber-600' },
-    { fill: 'fill-rose-600', dot: 'bg-rose-600' },
-    { fill: 'fill-sky-600', dot: 'bg-sky-600' },
-    { fill: 'fill-violet-600', dot: 'bg-violet-600' },
-    { fill: 'fill-lime-600', dot: 'bg-lime-600' },
-    { fill: 'fill-orange-600', dot: 'bg-orange-600' },
-    { fill: 'fill-teal-600', dot: 'bg-teal-600' },
-    { fill: 'fill-yellow-500', dot: 'bg-yellow-500' },
-    { fill: 'fill-fuchsia-600', dot: 'bg-fuchsia-600' },
-    { fill: 'fill-cyan-600', dot: 'bg-cyan-600' },
-    { fill: 'fill-indigo-500', dot: 'bg-indigo-500' },
+export function isReady(planting: { readyAt?: string | null; removedAt?: string | null }) {
+    return Boolean(planting.readyAt) && !planting.removedAt
+}
+
+/** The one green on the plan: this can be harvested. */
+const READY_FILL = 'fill-green-500'
+
+/**
+ * Everything else. Subdued on purpose and with no green among them, so that
+ * nothing on the plan competes with what is ready. Still more than one tone,
+ * because two crops side by side have to be told apart.
+ *
+ * Written out in full because Tailwind scans source text -- a class built by
+ * string concatenation at runtime would never make it into the stylesheet.
+ */
+const PLAIN_FILLS = [
+    'fill-slate-500',
+    'fill-stone-500',
+    'fill-sky-900',
+    'fill-indigo-900',
+    'fill-violet-900',
+    'fill-rose-900',
+    'fill-orange-900',
+    'fill-amber-900',
 ] as const
 
 /**
- * A colour per crop, worked out from its name, so tomatoes are the same colour
- * in every bed and on every phone without anything being stored. With twelve
- * colours two crops will sometimes share one.
+ * The fill of a planting's cells. The tone comes from the crop's name, so
+ * tomatoes look the same in every bed and on every phone without anything
+ * being stored; with eight tones two crops will sometimes share one.
  */
-export function cropColour(crop: string) {
+export function plantingColour(planting: {
+    crop: string
+    readyAt?: string | null
+    removedAt?: string | null
+}) {
+    if (isReady(planting)) {
+        return READY_FILL
+    }
+
     let hash = 0
-    for (const char of crop.trim().toLowerCase()) {
+    for (const char of planting.crop.trim().toLowerCase()) {
         hash = (hash * 31 + (char.codePointAt(0) ?? 0)) % 9973
     }
 
-    return CROP_COLOURS[hash % CROP_COLOURS.length]
+    return PLAIN_FILLS[hash % PLAIN_FILLS.length]
 }

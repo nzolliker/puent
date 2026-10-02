@@ -33,6 +33,9 @@ export const plantings = mysqlTable("plantings", {
   // shift it across a timezone.
   plantedAt: date("planted_at", { mode: "string" }).notNull(),
   removedAt: date("removed_at", { mode: "string" }),
+  // Since when it can be picked, or null while it cannot. A date rather than a
+  // flag for the reason `removedAt` is one: it says when as well as whether.
+  readyAt: date("ready_at", { mode: "string" }),
   // serial() is `bigint unsigned`, so the foreign keys have to match it.
   // Deleting the photo leaves the planting standing without one.
   photoId: bigint("photo_id", { mode: "number", unsigned: true }).references(

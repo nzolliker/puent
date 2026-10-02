@@ -25,6 +25,7 @@ const plantingColumns = {
   note: plantingsTable.note,
   plantedAt: plantingsTable.plantedAt,
   removedAt: plantingsTable.removedAt,
+  readyAt: plantingsTable.readyAt,
   photoId: plantingsTable.photoId,
   photoStorageKey: photosTable.storageKey,
   createdBy: plantingsTable.createdBy,
@@ -150,6 +151,7 @@ export const plantingsRoutes = new Hono<AppEnv>()
         note: planting.note || null,
         plantedAt: planting.plantedAt,
         removedAt: planting.removedAt ?? null,
+        readyAt: planting.readyAt ?? null,
         photoId: planting.photoId ?? null,
         createdBy: user.name,
         userId: user.id,
@@ -216,6 +218,9 @@ export const plantingsRoutes = new Hono<AppEnv>()
           note: patch.note === undefined ? undefined : patch.note || null,
           plantedAt: patch.plantedAt,
           removedAt: patch.removedAt,
+          // Left standing when a planting is cleared away: by then it is a
+          // record of when it ripened, and nothing shows it as pickable.
+          readyAt: patch.readyAt,
           photoId: patch.photoId,
         })
         .where(eq(plantingsTable.id, id));

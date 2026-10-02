@@ -95,6 +95,9 @@ change instead of quietly going stale.
   year". Each entry carries the bed in miniature with its cells filled in, and
   tapping one shows it on the bed again, so the log says where as well as what.
   What grew before the app existed can be entered after the fact.
+- A planting can be ticked **Erntereif**. That is the one green on the plan:
+  everything else is drawn in subdued tones, so what can be picked today stands
+  out, and the dashboard names it.
 - Two plantings cannot hold the same cell at once; the dialog greys out what is
   taken and the server refuses it regardless.
 - The dashboard shows the plan in small, with the same names on it.
@@ -409,7 +412,7 @@ address and answers `401` otherwise. Both rules live in one place,
 | `GET` | `/api/plantings` | everything growing now, across all beds |
 | `GET` | `/api/plantings/history?bedKey=` | what has been cleared away from one bed, newest first |
 | `POST` | `/api/plantings` | plant cells of a bed — a taken cell is a 409 |
-| `PATCH` | `/api/plantings/:id` | edit one, clear it away (`{ "removedAt": "2026-10-02" }`) or put it back (`null`) |
+| `PATCH` | `/api/plantings/:id` | edit one, clear it away (`{ "removedAt": "2026-10-02" }`) or put it back (`null`); `readyAt` marks it ready to harvest the same way |
 | `DELETE` | `/api/plantings/:id` | remove one entered by mistake |
 
 Uploaded files are served outside `/api`, at

@@ -26,7 +26,8 @@ import { FieldGroup } from '@/components/ui/field'
 import { Skeleton } from '@/components/ui/skeleton'
 import {
     createPlanting,
-    cropColour,
+    isReady,
+    plantingColour,
     deletePlanting,
     getCurrentPlantings,
     getPlantingHistory,
@@ -528,6 +529,9 @@ function PlantingRow({
     action,
     shown,
     onShow,
+    onReadyChange,
+    pendingReady,
+    busy,
 }: {
     bed: Bed
     planting: Planting
@@ -539,7 +543,18 @@ function PlantingRow({
     shown?: boolean
     /** Given for the log's rows: tapping one shows where it was in the bed. */
     onShow?: () => void
+    /** Given for what is growing: ticks it ready to harvest, or not. */
+    onReadyChange?: (ready: boolean) => void
+    /**
+     * What the box was just set to, while the server has not answered yet.
+     * Without it the tick would spring back for the length of the request.
+     */
+    pendingReady?: boolean
+    busy?: boolean
 }) {
+    const canEdit = useCanEdit()
+    const ready = pendingReady ?? isReady(planting)
+
     const details = [
         planting.removedAt
             ? `${formatDay(planting.plantedAt)} – ${formatDay(planting.removedAt)}`
@@ -554,7 +569,7 @@ function PlantingRow({
             <BedThumb
                 bed={bed}
                 cells={planting.cells}
-                colourClass={cropColour(planting.crop).fill}
+                colourClass={plantingColour(planting)}
                 className={cn(planting.removedAt && !shown && 'opacity-60')}
             />
             <div className="min-w-0 flex-1">
@@ -562,6 +577,31 @@ function PlantingRow({
                 <div className="truncate text-xs text-muted-foreground" title={planting.note ?? undefined}>
                     {details.join(' · ')}
                 </div>
+                {/* A member ticks it; a guest only reads the result. */}
+                {onReadyChange && canEdit ? (
+                    <label className="mt-1 flex w-fit items-center gap-1.5 text-xs">
+                        <input
+                            type="checkbox"
+                            className="size-4 accent-green-600"
+                            checked={ready}
+                            disabled={busy}
+                            onChange={(event) => onReadyChange(event.target.checked)}
+                        />
+                        <span className={ready ? 'text-green-500' : 'text-muted-foreground'}>
+                            Erntereif
+                        </span>
+                        {planting.readyAt && (
+                            <span className="text-muted-foreground">seit {formatDay(planting.readyAt)}</span>
+                        )}
+                    </label>
+                ) : (
+                    ready &&
+                    planting.readyAt && (
+                        <div className="mt-1 text-xs text-green-500">
+                            Erntereif seit {formatDay(planting.readyAt)}
+                        </div>
+                    )
+                )}
             </div>
         </>
     )
@@ -634,6 +674,12 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
     const [shownId, setShownId] = useState<number | null>(null)
     const shown = history.data?.plantings.find((planting) => planting.id === shownId)
 
+    const readyMutation = useMutation({
+        mutationFn: ({ id, ready }: { id: number; ready: boolean }) =>
+            updatePlanting(id, { readyAt: ready ? toLocalDayKey(new Date()) : null }),
+        onSuccess: invalidatePlantings,
+    })
+
     const clearMutation = useMutation({
         mutationFn: (id: number) => updatePlanting(id, { removedAt: toLocalDayKey(new Date()) }),
         onSuccess: invalidatePlantings,
@@ -689,6 +735,13 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                             planting={planting}
                             showCells={cellCount > 1}
                             onEdit={() => setDialog({ planting })}
+                            onReadyChange={(ready) => readyMutation.mutate({ id: planting.id, ready })}
+                            pendingReady={
+                                readyMutation.isPending && readyMutation.variables.id === planting.id
+                                    ? readyMutation.variables.ready
+                                    : undefined
+                            }
+                            busy={readyMutation.isPending}
                             action={
                                 <Button
                                     variant="outline"
@@ -707,8 +760,10 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
             ) : (
                 <p className="py-2 text-sm text-muted-foreground">Hier wächst gerade nichts.</p>
             )}
-            {clearMutation.error && (
-                <p className="text-sm text-destructive">{clearMutation.error.message}</p>
+            {(clearMutation.error ?? readyMutation.error) && (
+                <p className="text-sm text-destructive">
+                    {(clearMutation.error ?? readyMutation.error)?.message}
+                </p>
             )}
 
             <h3 className="mt-4 text-xs font-medium text-muted-foreground uppercase">Verlauf</h3>
@@ -775,6 +830,11 @@ function Beete() {
                     }
                     plantings={plantings}
                 />
+            </div>
+            {/* What the one green on the plan means. */}
+            <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
+                <span className="size-2.5 rounded-sm bg-green-500" />
+                erntereif
             </div>
             {error && (
                 <p className="mt-1 px-1 text-sm text-destructive">

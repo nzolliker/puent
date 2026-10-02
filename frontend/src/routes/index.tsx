@@ -15,7 +15,7 @@ import { api } from "@/lib/api"
 import { cn, dayKeyToDate, formatWeekday, getFirstName } from "@/lib/utils"
 import { getPhotos, photoUrl } from "@/lib/photos"
 import { getOpenTodos } from "@/lib/todos"
-import { getCurrentPlantings } from "@/lib/beds"
+import { getCurrentPlantings, isReady } from "@/lib/beds"
 import { GardenMap } from "@/components/garden-map"
 import { gardenLayout } from "@server/garden/layout"
 import { BOOKED_DRY, RAIN_BOOKED, RAIN_OPEN, rainLabel } from "@/lib/rain"
@@ -204,6 +204,7 @@ function Index() {
     const navigate = useNavigate()
     // Each crop once, however many beds it is in.
     const crops = [...new Set((plantingData?.plantings ?? []).map((planting) => planting.crop))]
+    const readyCrops = [...new Set((plantingData?.plantings ?? []).filter(isReady).map((planting) => planting.crop))]
 
     if (totalSpentError) return 'An error has occurred: ' + totalSpentError.message
     if (overviewError) return 'An error has occurred: ' + overviewError.message
@@ -280,9 +281,17 @@ function Index() {
                     </CardContent>
                     {plantingData && (
                         <CardFooter className="text-sm text-muted-foreground">
-                            <Link to="/beete" className="truncate hover:underline">
-                                {crops.length ? crops.join(', ') : 'Noch nichts gepflanzt'}
-                            </Link>
+                            {/* What can be picked comes first: it is the reason
+                                to go and look. */}
+                            {readyCrops.length ? (
+                                <Link to="/beete" className="truncate text-green-500 hover:underline">
+                                    Erntereif: {readyCrops.join(', ')}
+                                </Link>
+                            ) : (
+                                <Link to="/beete" className="truncate hover:underline">
+                                    {crops.length ? crops.join(', ') : 'Noch nichts gepflanzt'}
+                                </Link>
+                            )}
                         </CardFooter>
                     )}
                 </Card>

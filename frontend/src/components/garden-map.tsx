@@ -3,7 +3,7 @@ import type { KeyboardEvent } from 'react'
 
 import { bedBounds, bedCells, labelSlot, planViewBox } from '@server/garden/geometry'
 import type { Bed, GardenLayout } from '@server/garden/schema'
-import { cropColour } from '@/lib/beds'
+import { plantingColour } from '@/lib/beds'
 import { cn } from '@/lib/utils'
 
 /**
@@ -44,7 +44,14 @@ export type CellPicker = {
 }
 
 /** What the plan needs to know about a planting. A Planting from lib/beds fits. */
-export type MapPlanting = { id: number; bedKey: string; cells: number[]; crop: string }
+export type MapPlanting = {
+    id: number
+    bedKey: string
+    cells: number[]
+    crop: string
+    readyAt?: string | null
+    removedAt?: string | null
+}
 
 /**
  * A name cut to the room it has. The width of a letter is a guess -- there is
@@ -109,7 +116,7 @@ function BedGrid({
                                 isSelected
                                     ? 'fill-primary'
                                     : planting
-                                      ? cn(cropColour(planting.crop).fill, ghost && 'opacity-50')
+                                      ? cn(plantingColour(planting), ghost && 'opacity-50')
                                       : 'fill-transparent',
                                 picker && (isDisabled ? 'opacity-40' : 'cursor-pointer'),
                             )}

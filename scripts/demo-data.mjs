@@ -112,16 +112,17 @@ const TODOS_DONE = [
  * server/garden/layout.ts is redrawn. A bed the layout does not have, or a
  * share that rounds to no cell, is skipped.
  *
- * [bed, crop, from, to, planted, removed, note] -- `from` and `to` are
+ * [bed, crop, from, to, planted, removed, note, ready] -- `from` and `to` are
  * fractions of the bed's cells, and the ones still growing in one bed must not
- * overlap.
+ * overlap. `ready` is the day it became ready to harvest: two of them are, so
+ * the plan has its green to show.
  */
 const PLANTINGS = [
-  [0, 'Tomaten', 0, 0.5, '2026-05-14', null, 'San Marzano'],
+  [0, 'Tomaten', 0, 0.5, '2026-05-14', null, 'San Marzano', '2026-09-20'],
   [0, 'Basilikum', 0.5, 0.75, '2026-05-20', null, null],
   [0, 'Spinat', 0, 0.5, '2026-03-08', '2026-05-10', null],
   [0, 'Radieschen', 0.5, 1, '2026-03-22', '2026-05-16', 'Schnecken haben die Hälfte geholt'],
-  [1, 'Salat', 0, 0.67, '2026-08-02', null, 'Lollo rosso'],
+  [1, 'Salat', 0, 0.67, '2026-08-02', null, 'Lollo rosso', '2026-09-28'],
   [1, 'Erbsen', 0, 1, '2026-04-04', '2026-07-20', null],
   [2, 'Kürbis', 0, 1, '2026-05-25', null, null],
   [3, 'Salbei', 0, 0.25, '2025-04-12', null, null],
@@ -237,7 +238,7 @@ try {
   console.log(`  todos        ${todos.length} rows (${TODOS_OPEN.length} still open)`)
 
   await db.query('DELETE FROM `plantings`')
-  const plantings = PLANTINGS.flatMap(([bedIndex, crop, from, to, plantedAt, removedAt, note]) => {
+  const plantings = PLANTINGS.flatMap(([bedIndex, crop, from, to, plantedAt, removedAt, note, readyAt = null]) => {
     const bed = gardenLayout.beds[bedIndex]
     if (!bed) return []
 
@@ -247,11 +248,11 @@ try {
     const share = cells.slice(Math.round(from * cells.length), Math.round(to * cells.length))
     if (share.length === 0) return []
 
-    return [[bed.key, JSON.stringify(share), crop, note, plantedAt, removedAt, 'Anna Brunner']]
+    return [[bed.key, JSON.stringify(share), crop, note, plantedAt, removedAt, readyAt, 'Anna Brunner']]
   })
   if (plantings.length > 0) {
     await db.query(
-      'INSERT INTO `plantings` (`bed_key`, `cells`, `crop`, `note`, `planted_at`, `removed_at`, `created_by`) VALUES ?',
+      'INSERT INTO `plantings` (`bed_key`, `cells`, `crop`, `note`, `planted_at`, `removed_at`, `ready_at`, `created_by`) VALUES ?',
       [plantings],
     )
     await db.query(
