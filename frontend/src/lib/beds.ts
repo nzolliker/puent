@@ -29,6 +29,7 @@ export type PlantingInput = {
     plantedAt: string
     /** Null means it is still growing. */
     removedAt: string | null
+    photoId: number | null
 }
 
 /**

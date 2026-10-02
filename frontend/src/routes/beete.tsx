@@ -1,10 +1,10 @@
 import { createFileRoute } from '@tanstack/react-router'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useForm, useStore } from '@tanstack/react-form'
 import type { AnyFieldApi } from '@tanstack/react-form'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
-import { Pencil, Plus, X } from 'lucide-react'
+import { Images, Loader2, Pencil, Plus, Upload, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { MemberOnly, ReadOnlyNotice } from '@/components/access'
@@ -33,6 +33,7 @@ import {
     updatePlanting,
 } from '@/lib/beds'
 import type { Planting } from '@/lib/beds'
+import { getPhotos, photoUrl, uploadPhotos } from '@/lib/photos'
 import { cn, dayKeyToDate, toLocalDayKey } from '@/lib/utils'
 import { bedCells } from '@server/garden/geometry'
 import { findBed, gardenLayout } from '@server/garden/layout'
@@ -99,6 +100,134 @@ function FieldInfo({ field }: { field: AnyFieldApi }) {
     )
 }
 
+type PlantingPhoto = { id: number; storageKey: string }
+
+/**
+ * The one photo a planting may carry: picked from the library, or uploaded
+ * here. An upload goes through the same path as the Fotos page and lands in
+ * the library like any other, which is also why it stays there if the dialog
+ * is cancelled afterwards.
+ */
+function PhotoField({
+    photo,
+    onChange,
+    caption,
+}: {
+    photo: PlantingPhoto | null
+    onChange: (photo: PlantingPhoto | null) => void
+    /** Goes onto an uploaded picture, so it says what it shows in the library. */
+    caption: string
+}) {
+    const queryClient = useQueryClient()
+    const inputRef = useRef<HTMLInputElement>(null)
+    const [libraryOpen, setLibraryOpen] = useState(false)
+
+    // Same key as the Fotos page and the dashboard, so this is usually cached.
+    const library = useQuery({
+        queryKey: ['get-photos', null],
+        queryFn: () => getPhotos(),
+        enabled: libraryOpen,
+    })
+
+    const uploadMutation = useMutation({
+        mutationFn: (file: File) => uploadPhotos({ files: [file], caption, takenAt: '' }),
+        onSuccess: async (result) => {
+            await queryClient.invalidateQueries({ queryKey: ['get-photos'] })
+            const uploaded = result.photos[0]
+            if (uploaded) onChange(uploaded)
+        },
+    })
+
+    // A file the server turned down comes back as a success with a reason.
+    const uploadError = uploadMutation.error?.message ?? uploadMutation.data?.failed[0]?.reason
+
+    return (
+        <div className="grid gap-2">
+            <Label>Foto</Label>
+            {photo ? (
+                <div className="flex items-center gap-3">
+                    <img
+                        src={photoUrl(photo.storageKey)}
+                        alt=""
+                        className="size-16 rounded-md bg-muted object-cover"
+                    />
+                    <Button type="button" variant="outline" size="sm" onClick={() => onChange(null)}>
+                        <X />
+                        Entfernen
+                    </Button>
+                </div>
+            ) : (
+                <div className="grid grid-cols-2 gap-2">
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        aria-expanded={libraryOpen}
+                        onClick={() => setLibraryOpen((open) => !open)}
+                    >
+                        <Images />
+                        Aus Fotos
+                    </Button>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={uploadMutation.isPending}
+                        onClick={() => inputRef.current?.click()}
+                    >
+                        {uploadMutation.isPending ? <Loader2 className="animate-spin" /> : <Upload />}
+                        Hochladen
+                    </Button>
+                    <input
+                        ref={inputRef}
+                        type="file"
+                        accept="image/*,.heic,.heif"
+                        className="hidden"
+                        onChange={(event) => {
+                            const file = event.target.files?.[0]
+                            event.target.value = ''
+                            if (file) uploadMutation.mutate(file)
+                        }}
+                    />
+                </div>
+            )}
+            {!photo && libraryOpen && (
+                library.error ? (
+                    <p className="text-sm text-destructive">Fotos konnten nicht geladen werden.</p>
+                ) : library.isPending ? (
+                    <Skeleton className="h-20 w-full" />
+                ) : library.data.photos.length ? (
+                    <div className="grid max-h-44 grid-cols-4 gap-1 overflow-y-auto">
+                        {library.data.photos.map((item) => (
+                            <button
+                                key={item.id}
+                                type="button"
+                                aria-label={item.caption ?? `Foto ${item.id}`}
+                                className="aspect-square overflow-hidden rounded-md bg-muted focus:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                                onClick={() => {
+                                    onChange({ id: item.id, storageKey: item.storageKey })
+                                    setLibraryOpen(false)
+                                }}
+                            >
+                                <img
+                                    src={photoUrl(item.storageKey)}
+                                    alt=""
+                                    loading="lazy"
+                                    decoding="async"
+                                    className="h-full w-full object-cover"
+                                />
+                            </button>
+                        ))}
+                    </div>
+                ) : (
+                    <p className="text-sm text-muted-foreground">Noch keine Fotos.</p>
+                )
+            )}
+            {!photo && uploadError && <p className="text-sm text-destructive">{uploadError}</p>}
+        </div>
+    )
+}
+
 /**
  * Adds a planting, or edits the one passed in. Mounted only while open, so the
  * form always starts from the planting it was opened for.
@@ -118,9 +247,20 @@ function PlantingDialog({
     const invalidatePlantings = useInvalidatePlantings()
     const cells = bedCells(bed)
 
+    // Beside the form rather than in it: nothing about a photo needs validating.
+    const [photo, setPhoto] = useState<PlantingPhoto | null>(
+        planting?.photoId && planting.photoStorageKey
+            ? { id: planting.photoId, storageKey: planting.photoStorageKey }
+            : null,
+    )
+
     const saveMutation = useMutation({
         mutationFn: (value: PlantingFormValues) => {
-            const input = { ...value, removedAt: value.removedAt || null }
+            const input = {
+                ...value,
+                removedAt: value.removedAt || null,
+                photoId: photo?.id ?? null,
+            }
 
             return planting ? updatePlanting(planting.id, input) : createPlanting(bed.key, input)
         },
@@ -326,6 +466,16 @@ function PlantingDialog({
                             </div>
                         )}
                     />
+                    <form.Subscribe
+                        selector={(state) => state.values.crop.trim()}
+                        children={(crop) => (
+                            <PhotoField
+                                photo={photo}
+                                onChange={setPhoto}
+                                caption={crop ? `${crop} · ${bed.name}` : bed.name}
+                            />
+                        )}
+                    />
                     {error && <p className="text-sm text-destructive">{error.message}</p>}
                 </FieldGroup>
                 <DialogFooter className="sticky bottom-0 mt-4 border-t bg-background px-4 py-4 pb-[max(1rem,env(safe-area-inset-bottom))] sm:px-6">
@@ -408,6 +558,23 @@ function PlantingRow({
                     {details.join(' · ')}
                 </div>
             </div>
+            {planting.photoStorageKey && (
+                <a
+                    href={photoUrl(planting.photoStorageKey, 'display')}
+                    target="_blank"
+                    rel="noreferrer"
+                    aria-label={`Foto von ${planting.crop}`}
+                    className="size-9 shrink-0 overflow-hidden rounded-md bg-muted"
+                >
+                    <img
+                        src={photoUrl(planting.photoStorageKey)}
+                        alt=""
+                        loading="lazy"
+                        decoding="async"
+                        className="h-full w-full object-cover"
+                    />
+                </a>
+            )}
             <MemberOnly>
                 {action}
                 <Button
