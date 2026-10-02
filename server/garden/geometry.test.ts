@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { bedBounds, bedCells, planViewBox } from "./geometry";
+import { bedBounds, bedCells, labelSlot, planViewBox } from "./geometry";
 import { gardenLayout } from "./layout";
 import { bedSchema, gardenLayoutSchema } from "./schema";
 
@@ -73,6 +73,41 @@ describe("bedCells", () => {
     });
 
     expect(bedCells(bed).map((cell) => cell.index)).toEqual([0]);
+  });
+});
+
+describe("labelSlot", () => {
+  // 4 columns by 2 rows, each cell 1 m wide and 0.5 m high, from (1, 2).
+  const bed = bedSchema.parse({
+    key: "r",
+    name: "R",
+    shape: "rect",
+    x: 1,
+    y: 2,
+    w: 4,
+    h: 1,
+    grid: [4, 2],
+  });
+
+  test("a run in one row is the slot", () => {
+    expect(labelSlot(bed, [1, 2, 3])).toEqual({ x: 2, y: 2, w: 3, h: 0.5 });
+  });
+
+  test("an L takes its wide arm, not its corner", () => {
+    // The left column and the whole bottom row.
+    expect(labelSlot(bed, [0, 4, 5, 6, 7])).toEqual({ x: 1, y: 2.5, w: 4, h: 0.5 });
+  });
+
+  test("a block over two rows is centred over both", () => {
+    expect(labelSlot(bed, [0, 1, 4, 5])).toEqual({ x: 1, y: 2, w: 2, h: 1 });
+  });
+
+  test("two patches that do not touch give the wider one", () => {
+    expect(labelSlot(bed, [0, 2, 3])).toEqual({ x: 3, y: 2, w: 2, h: 0.5 });
+  });
+
+  test("cells the bed does not have give nothing", () => {
+    expect(labelSlot(bed, [8, 9])).toBeNull();
   });
 });
 

@@ -8,7 +8,7 @@ import { Images, Loader2, Pencil, Plus, Upload, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
 import { MemberOnly, ReadOnlyNotice } from '@/components/access'
-import { BedView, GardenMap } from '@/components/garden-map'
+import { BedThumb, BedView, GardenMap } from '@/components/garden-map'
 import { useCanEdit } from '@/lib/auth'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -30,7 +30,6 @@ import {
     deletePlanting,
     getCurrentPlantings,
     getPlantingHistory,
-    plantingFill,
     updatePlanting,
 } from '@/lib/beds'
 import type { Planting } from '@/lib/beds'
@@ -354,10 +353,7 @@ function PlantingDialog({
                                     </div>
                                     <BedView
                                         bed={bed}
-                                        cellClass={(index) => {
-                                            const other = others.find((o) => o.cells.includes(index))
-                                            return other && cropColour(other.crop).fill
-                                        }}
+                                        plantings={others}
                                         picker={{
                                             selected: field.state.value,
                                             disabled: taken,
@@ -525,16 +521,24 @@ function PlantingDialog({
 
 /** One planting in the panel's lists, growing or cleared away. */
 function PlantingRow({
+    bed,
     planting,
     showCells,
     onEdit,
     action,
+    shown,
+    onShow,
 }: {
+    bed: Bed
     planting: Planting
     /** Off for a bed without a grid, where "1 Feld" says nothing. */
     showCells: boolean
     onEdit: () => void
     action?: ReactNode
+    /** Whether this is the planting the bed above is showing. */
+    shown?: boolean
+    /** Given for the log's rows: tapping one shows where it was in the bed. */
+    onShow?: () => void
 }) {
     const details = [
         planting.removedAt
@@ -544,14 +548,14 @@ function PlantingRow({
         planting.note,
     ].filter(Boolean)
 
-    return (
-        <li className="flex items-center gap-2 py-2">
-            <span
-                className={cn(
-                    'size-3 shrink-0 rounded-full',
-                    cropColour(planting.crop).dot,
-                    planting.removedAt && 'opacity-40',
-                )}
+    // The bed in small, with this planting's cells filled: where it is, or was.
+    const summary = (
+        <>
+            <BedThumb
+                bed={bed}
+                cells={planting.cells}
+                colourClass={cropColour(planting.crop).fill}
+                className={cn(planting.removedAt && !shown && 'opacity-60')}
             />
             <div className="min-w-0 flex-1">
                 <div className="truncate text-sm">{planting.crop}</div>
@@ -559,6 +563,24 @@ function PlantingRow({
                     {details.join(' · ')}
                 </div>
             </div>
+        </>
+    )
+
+    return (
+        <li className="flex items-center gap-2 py-2">
+            {onShow ? (
+                <button
+                    type="button"
+                    aria-pressed={shown}
+                    aria-label={`${planting.crop} im Beet zeigen`}
+                    onClick={onShow}
+                    className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left hover:bg-accent aria-pressed:bg-accent"
+                >
+                    {summary}
+                </button>
+            ) : (
+                <div className="flex min-w-0 flex-1 items-center gap-2">{summary}</div>
+            )}
             {planting.photoStorageKey && (
                 <a
                     href={photoUrl(planting.photoStorageKey, 'display')}
@@ -606,6 +628,12 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
         queryFn: () => getPlantingHistory(bed.key),
     })
 
+    // The cleared-away planting on show in the bed above, if any. Kept as an id
+    // and looked up, so it lets go by itself when that planting is put back
+    // into the ground or deleted.
+    const [shownId, setShownId] = useState<number | null>(null)
+    const shown = history.data?.plantings.find((planting) => planting.id === shownId)
+
     const clearMutation = useMutation({
         mutationFn: (id: number) => updatePlanting(id, { removedAt: toLocalDayKey(new Date()) }),
         onSuccess: invalidatePlantings,
@@ -626,14 +654,30 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                 </Button>
             </div>
 
+            {/* Either what is growing, or the one cleared-away planting whose
+                row in the log was tapped. */}
             <BedView
                 bed={bed}
                 className="mt-3"
-                cellClass={(index) => {
-                    const planting = current.find((p) => p.cells.includes(index))
-                    return planting && cropColour(planting.crop).fill
-                }}
+                plantings={shown ? [shown] : current}
+                ghost={shown !== undefined}
             />
+            {shown?.removedAt && (
+                <div className="mt-2 flex items-center justify-between gap-2 text-xs text-muted-foreground">
+                    <span className="truncate">
+                        Früher: {shown.crop}, {formatDay(shown.plantedAt)} – {formatDay(shown.removedAt)}
+                    </span>
+                    <Button
+                        variant="outline"
+                        size="xs"
+                        type="button"
+                        className="shrink-0"
+                        onClick={() => setShownId(null)}
+                    >
+                        Aktuell zeigen
+                    </Button>
+                </div>
+            )}
 
             <h3 className="mt-4 text-xs font-medium text-muted-foreground uppercase">Aktuell</h3>
             {current.length ? (
@@ -641,6 +685,7 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                     {current.map((planting) => (
                         <PlantingRow
                             key={planting.id}
+                            bed={bed}
                             planting={planting}
                             showCells={cellCount > 1}
                             onEdit={() => setDialog({ planting })}
@@ -676,9 +721,12 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                     {history.data.plantings.map((planting) => (
                         <PlantingRow
                             key={planting.id}
+                            bed={bed}
                             planting={planting}
                             showCells={cellCount > 1}
                             onEdit={() => setDialog({ planting })}
+                            shown={planting.id === shownId}
+                            onShow={() => setShownId(planting.id === shownId ? null : planting.id)}
                         />
                     ))}
                 </ul>
@@ -725,7 +773,7 @@ function Beete() {
                     onSelect={(key) =>
                         void navigate({ search: key === bed?.key ? {} : { beet: key }, replace: true })
                     }
-                    cellClass={plantingFill(plantings)}
+                    plantings={plantings}
                 />
             </div>
             {error && (

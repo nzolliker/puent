@@ -101,12 +101,3 @@ export function cropColour(crop: string) {
 
     return CROP_COLOURS[hash % CROP_COLOURS.length]
 }
-
-/** How the plan colours a cell: by the crop growing in it, or not at all. */
-export function plantingFill(plantings: Planting[]) {
-    return (bedKey: string, index: number) => {
-        const planting = plantings.find((p) => p.bedKey === bedKey && p.cells.includes(index))
-
-        return planting && cropColour(planting.crop).fill
-    }
-}

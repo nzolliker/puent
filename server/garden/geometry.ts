@@ -34,25 +34,6 @@ export function bedBounds(bed: Bed): Rect {
   }
 }
 
-/** Where a bed's name goes. */
-export function bedCentre(bed: Bed): Point {
-  switch (bed.shape) {
-    case "rect":
-      return [bed.x + bed.w / 2, bed.y + bed.h / 2];
-    case "circle":
-      return [bed.cx, bed.cy];
-    case "polygon": {
-      // The mean of the corners rather than the middle of the bounding box,
-      // which for a triangle sits on its longest edge.
-      const sum = bed.points.reduce(
-        (acc, [x, y]) => [acc[0] + x, acc[1] + y] as Point,
-        [0, 0] as Point,
-      );
-      return [sum[0] / bed.points.length, sum[1] / bed.points.length];
-    }
-  }
-}
-
 function isInside(bed: Bed, x: number, y: number): boolean {
   switch (bed.shape) {
     case "rect":
@@ -141,5 +122,70 @@ export function planViewBox(layout: GardenLayout, margin = 0.5): Rect {
     y: bounds.y - margin,
     w: bounds.w + 2 * margin,
     h: bounds.h + 2 * margin,
+  };
+}
+
+/**
+ * Where a planting's name goes: the widest unbroken run of its cells in one
+ * row, grown over the rows next to it that hold the same columns.
+ *
+ * A planting need not be a rectangle -- it can be an L, or two patches that do
+ * not touch -- so "the middle of its cells" may be a cell it does not have.
+ * The widest run is where a name has the most room, and growing it is what
+ * puts the name in the middle of a two-row block instead of in its top row.
+ *
+ * Null when none of the cells exist in this bed.
+ */
+export function labelSlot(bed: Bed, cells: readonly number[]): Rect | null {
+  const [cols, rows] = bed.grid;
+  const wanted = new Set(cells);
+  const byIndex = new Map(
+    bedCells(bed)
+      .filter((cell) => wanted.has(cell.index))
+      .map((cell) => [cell.index, cell]),
+  );
+
+  const has = (row: number, col: number) => byIndex.has(row * cols + col);
+
+  let best: { row: number; from: number; to: number } | null = null;
+  for (let row = 0; row < rows; row++) {
+    for (let col = 0; col < cols; col++) {
+      if (!has(row, col)) continue;
+
+      const from = col;
+      while (col + 1 < cols && has(row, col + 1)) col++;
+
+      if (!best || col - from > best.to - best.from) {
+        best = { row, from, to: col };
+      }
+    }
+  }
+
+  if (!best) {
+    return null;
+  }
+
+  const { from, to } = best;
+  const spans = (row: number) => {
+    if (row < 0 || row >= rows) return false;
+    for (let col = from; col <= to; col++) {
+      if (!has(row, col)) return false;
+    }
+    return true;
+  };
+
+  let top = best.row;
+  let bottom = best.row;
+  while (spans(top - 1)) top--;
+  while (spans(bottom + 1)) bottom++;
+
+  const first = byIndex.get(top * cols + from)!;
+  const last = byIndex.get(bottom * cols + to)!;
+
+  return {
+    x: first.x,
+    y: first.y,
+    w: last.x + last.w - first.x,
+    h: last.y + last.h - first.y,
   };
 }

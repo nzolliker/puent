@@ -15,7 +15,7 @@ import { api } from "@/lib/api"
 import { cn, dayKeyToDate, formatWeekday, getFirstName } from "@/lib/utils"
 import { getPhotos, photoUrl } from "@/lib/photos"
 import { getOpenTodos } from "@/lib/todos"
-import { getCurrentPlantings, plantingFill } from "@/lib/beds"
+import { getCurrentPlantings } from "@/lib/beds"
 import { GardenMap } from "@/components/garden-map"
 import { gardenLayout } from "@server/garden/layout"
 import { BOOKED_DRY, RAIN_BOOKED, RAIN_OPEN, rainLabel } from "@/lib/rain"
@@ -270,12 +270,12 @@ function Index() {
                     </CardHeader>
                     <CardContent>
                         {/* Drawn from the layout file, so it needs no loading
-                            state: the plan is there at once and the colours
+                            state: the plan is there at once and the crops
                             follow. A tap opens that bed. */}
                         <GardenMap
                             layout={gardenLayout}
                             onSelect={(key) => void navigate({ to: '/beete', search: { beet: key } })}
-                            cellClass={plantingFill(plantingData?.plantings ?? [])}
+                            plantings={plantingData?.plantings}
                         />
                     </CardContent>
                     {plantingData && (

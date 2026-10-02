@@ -85,16 +85,19 @@ change instead of quietly going stale.
 - A plan of the plot with every bed on it, drawn to scale. Beds can be
   rectangles, circles or any polygon, because the real ones are.
 - Each bed is divided into a small grid cut to its shape, so a planting can take
-  a quarter of a bed and something else the rest. Tapping a bed opens it; the
-  open bed lives in the URL.
+  a quarter of a bed and something else the rest. What grows there is written
+  on the plan itself, shortened where the patch is small. Tapping a bed opens
+  it; the open bed lives in the URL.
 - A planting is a crop, the cells it takes, the day it went in, a note and
   optionally one photo — picked from the library or uploaded on the spot.
 - *Abräumen* does not delete it. The planting gets the day it came out and moves
   to the bed's **Verlauf**, which is how the page answers "what was in here last
-  year". What grew before the app existed can be entered after the fact.
+  year". Each entry carries the bed in miniature with its cells filled in, and
+  tapping one shows it on the bed again, so the log says where as well as what.
+  What grew before the app existed can be entered after the fact.
 - Two plantings cannot hold the same cell at once; the dialog greys out what is
   taken and the server refuses it regardless.
-- The dashboard shows the plan in small, coloured by what is growing.
+- The dashboard shows the plan in small, with the same names on it.
 
 **Accounts**
 - The app has no login screen and stores no passwords. Cloudflare Access signs
