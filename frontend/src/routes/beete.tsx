@@ -152,7 +152,7 @@ function PhotoField({
                         alt=""
                         className="size-16 rounded-md bg-muted object-cover"
                     />
-                    <Button type="button" variant="outline" size="sm" onClick={() => onChange(null)}>
+                    <Button type="button" variant="outline" onClick={() => onChange(null)}>
                         <X />
                         Entfernen
                     </Button>
@@ -162,7 +162,7 @@ function PhotoField({
                     <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                       
                         aria-expanded={libraryOpen}
                         onClick={() => setLibraryOpen((open) => !open)}
                     >
@@ -172,7 +172,7 @@ function PhotoField({
                     <Button
                         type="button"
                         variant="outline"
-                        size="sm"
+                       
                         disabled={uploadMutation.isPending}
                         onClick={() => inputRef.current?.click()}
                     >
@@ -335,11 +335,12 @@ function PlantingDialog({
                             name="cells"
                             children={(field) => (
                                 <div className="grid gap-2">
-                                    <div className="flex items-baseline justify-between">
+                                    <div className="flex items-center justify-between">
                                         <Label>Wo</Label>
-                                        <button
+                                        <Button
                                             type="button"
-                                            className="text-xs text-muted-foreground underline-offset-4 hover:underline"
+                                            variant="outline"
+                                            size="sm"
                                             onClick={() => {
                                                 field.handleChange(
                                                     cells
@@ -350,7 +351,7 @@ function PlantingDialog({
                                             }}
                                         >
                                             Alles Freie
-                                        </button>
+                                        </Button>
                                     </div>
                                     <BedView
                                         bed={bed}
@@ -373,79 +374,80 @@ function PlantingDialog({
                             )}
                         />
                     )}
-                    <div className="grid grid-cols-2 gap-3">
-                        <form.Field
-                            name="plantedAt"
-                            children={(field) => (
-                                <div className="grid content-start gap-2">
-                                    <Label htmlFor={field.name}>Gepflanzt am</Label>
-                                    <Input
-                                        id={field.name}
-                                        name={field.name}
-                                        type="date"
-                                        value={field.state.value}
-                                        onBlur={field.handleBlur}
-                                        onChange={(e) => field.handleChange(e.target.value)}
-                                    />
-                                    <FieldInfo field={field} />
-                                </div>
-                            )}
-                        />
-                        {/* Offered on a new entry as well: that is how what
-                            grew here in earlier years gets into the log.
+                    <form.Field
+                        name="plantedAt"
+                        children={(field) => (
+                            <div className="grid min-w-0 gap-2">
+                                <Label htmlFor={field.name}>Gepflanzt am</Label>
+                                <Input
+                                    id={field.name}
+                                    name={field.name}
+                                    type="date"
+                                    value={field.state.value}
+                                    onBlur={field.handleBlur}
+                                    onChange={(e) => field.handleChange(e.target.value)}
+                                />
+                                <FieldInfo field={field} />
+                            </div>
+                        )}
+                    />
+                    {/* Each date on a row of its own: an iPhone's date input does
+                        not shrink, and two of them side by side overlap.
 
-                            A button until a date is wanted, because an empty
-                            date input is not reliably empty to look at --
-                            WebKit fills it with today's date as a placeholder. */}
-                        <form.Field
-                            name="removedAt"
-                            children={(field) => (
-                                <div className="grid content-start gap-2">
-                                    <Label htmlFor={field.name}>Abgeräumt am</Label>
-                                    {field.state.value === '' ? (
-                                        <Button
+                        Offered on a new entry as well: that is how what
+                        grew here in earlier years gets into the log.
+
+                        A button until a date is wanted, because an empty
+                        date input is not reliably empty to look at --
+                        WebKit fills it with today's date as a placeholder. */}
+                    <form.Field
+                        name="removedAt"
+                        children={(field) => (
+                            <div className="grid min-w-0 gap-2">
+                                <Label htmlFor={field.name}>Abgeräumt am</Label>
+                                {field.state.value === '' ? (
+                                    <Button
+                                        id={field.name}
+                                        type="button"
+                                        variant="outline"
+                                        className="justify-start font-normal text-muted-foreground"
+                                        onClick={() => {
+                                            const today = toLocalDayKey(new Date())
+                                            const plantedAt = form.getFieldValue('plantedAt')
+                                            // Never earlier than it was planted.
+                                            field.handleChange(today >= plantedAt ? today : plantedAt)
+                                            field.handleBlur()
+                                        }}
+                                    >
+                                        Noch nicht
+                                    </Button>
+                                ) : (
+                                    <div className="flex min-w-0 items-center gap-1">
+                                        <Input
                                             id={field.name}
+                                            name={field.name}
+                                            type="date"
+                                            value={field.state.value}
+                                            onBlur={field.handleBlur}
+                                            onChange={(e) => field.handleChange(e.target.value)}
+                                        />
+                                        <Button
                                             type="button"
-                                            variant="outline"
-                                            className="justify-start font-normal text-muted-foreground"
-                                            onClick={() => {
-                                                const today = toLocalDayKey(new Date())
-                                                const plantedAt = form.getFieldValue('plantedAt')
-                                                // Never earlier than it was planted.
-                                                field.handleChange(today >= plantedAt ? today : plantedAt)
-                                                field.handleBlur()
-                                            }}
+                                            variant="ghost"
+                                            size="icon"
+                                            className="shrink-0"
+                                            aria-label="Wächst noch"
+                                            title="Wächst noch"
+                                            onClick={() => field.handleChange('')}
                                         >
-                                            Noch nicht
+                                            <X />
                                         </Button>
-                                    ) : (
-                                        <div className="flex items-center gap-1">
-                                            <Input
-                                                id={field.name}
-                                                name={field.name}
-                                                type="date"
-                                                value={field.state.value}
-                                                onBlur={field.handleBlur}
-                                                onChange={(e) => field.handleChange(e.target.value)}
-                                            />
-                                            <Button
-                                                type="button"
-                                                variant="ghost"
-                                                size="icon-xs"
-                                                className="shrink-0"
-                                                aria-label="Wächst noch"
-                                                title="Wächst noch"
-                                                onClick={() => field.handleChange('')}
-                                            >
-                                                <X />
-                                            </Button>
-                                        </div>
-                                    )}
-                                    <FieldInfo field={field} />
-                                </div>
-                            )}
-                        />
-                    </div>
+                                    </div>
+                                )}
+                                <FieldInfo field={field} />
+                            </div>
+                        )}
+                    />
                     <form.Field
                         name="note"
                         children={(field) => (
@@ -524,7 +526,6 @@ function PlantingDialog({
 function PlantingRow({
     bed,
     planting,
-    showCells,
     onEdit,
     action,
     shown,
@@ -535,8 +536,6 @@ function PlantingRow({
 }: {
     bed: Bed
     planting: Planting
-    /** Off for a bed without a grid, where "1 Feld" says nothing. */
-    showCells: boolean
     onEdit: () => void
     action?: ReactNode
     /** Whether this is the planting the bed above is showing. */
@@ -555,11 +554,15 @@ function PlantingRow({
     const canEdit = useCanEdit()
     const ready = pendingReady ?? isReady(planting)
 
-    const details = [
+    const details: ReactNode[] = [
         planting.removedAt
             ? `${formatDay(planting.plantedAt)} – ${formatDay(planting.removedAt)}`
             : `seit ${formatDay(planting.plantedAt)}`,
-        showCells && (planting.cells.length === 1 ? '1 Feld' : `${planting.cells.length} Felder`),
+        // Here rather than beside the checkbox, where it would not fit a
+        // phone -- and here a guest, who gets no checkbox, reads it too.
+        isReady(planting) && planting.readyAt && (
+            <span className="text-green-500">erntereif seit {formatDay(planting.readyAt)}</span>
+        ),
         planting.note,
     ].filter(Boolean)
 
@@ -575,82 +578,94 @@ function PlantingRow({
             <div className="min-w-0 flex-1">
                 <div className="truncate text-sm">{planting.crop}</div>
                 <div className="truncate text-xs text-muted-foreground" title={planting.note ?? undefined}>
-                    {details.join(' · ')}
-                </div>
-                {/* A member ticks it; a guest only reads the result. */}
-                {onReadyChange && canEdit ? (
-                    <label className="mt-1 flex w-fit items-center gap-1.5 text-xs">
-                        <input
-                            type="checkbox"
-                            className="size-4 accent-green-600"
-                            checked={ready}
-                            disabled={busy}
-                            onChange={(event) => onReadyChange(event.target.checked)}
-                        />
-                        <span className={ready ? 'text-green-500' : 'text-muted-foreground'}>
-                            Erntereif
+                    {details.map((detail, index) => (
+                        <span key={index}>
+                            {index > 0 && ' · '}
+                            {detail}
                         </span>
-                        {planting.readyAt && (
-                            <span className="text-muted-foreground">seit {formatDay(planting.readyAt)}</span>
-                        )}
-                    </label>
-                ) : (
-                    ready &&
-                    planting.readyAt && (
-                        <div className="mt-1 text-xs text-green-500">
-                            Erntereif seit {formatDay(planting.readyAt)}
-                        </div>
-                    )
-                )}
+                    ))}
+                </div>
             </div>
         </>
     )
 
+    const editButton = (
+        <Button
+            variant="ghost"
+            size="icon"
+            type="button"
+            className="shrink-0"
+            aria-label={`${planting.crop} ändern`}
+            onClick={onEdit}
+        >
+            <Pencil />
+        </Button>
+    )
+
+    // What is growing has more to act on than fits beside its name on a
+    // phone, so its controls get a line of their own. A row in the log has
+    // only the pencil, which stays where it is.
+    const ownLine = canEdit && (onReadyChange !== undefined || action !== undefined)
+
     return (
-        <li className="flex items-center gap-2 py-2">
-            {onShow ? (
-                <button
-                    type="button"
-                    aria-pressed={shown}
-                    aria-label={`${planting.crop} im Beet zeigen`}
-                    onClick={onShow}
-                    className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left hover:bg-accent aria-pressed:bg-accent"
-                >
-                    {summary}
-                </button>
-            ) : (
-                <div className="flex min-w-0 flex-1 items-center gap-2">{summary}</div>
+        <li className="py-2">
+            <div className="flex items-center gap-2">
+                {onShow ? (
+                    <button
+                        type="button"
+                        aria-pressed={shown}
+                        aria-label={`${planting.crop} im Beet zeigen`}
+                        onClick={onShow}
+                        className="-m-1 flex min-w-0 flex-1 items-center gap-2 rounded-md p-1 text-left hover:bg-accent aria-pressed:bg-accent"
+                    >
+                        {summary}
+                    </button>
+                ) : (
+                    <div className="flex min-w-0 flex-1 items-center gap-2">{summary}</div>
+                )}
+                {planting.photoStorageKey && (
+                    <a
+                        href={photoUrl(planting.photoStorageKey, 'display')}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Foto von ${planting.crop}`}
+                        className="size-9 shrink-0 overflow-hidden rounded-md bg-muted"
+                    >
+                        <img
+                            src={photoUrl(planting.photoStorageKey)}
+                            alt=""
+                            loading="lazy"
+                            decoding="async"
+                            className="h-full w-full object-cover"
+                        />
+                    </a>
+                )}
+                {!ownLine && <MemberOnly>{editButton}</MemberOnly>}
+            </div>
+            {ownLine && (
+                // Indented to start under the name, past the bed in small.
+                <div className="mt-1 flex items-center gap-1 pl-11">
+                    {onReadyChange && (
+                        // The whole label is the target, not the box alone.
+                        <label className="flex min-h-9 min-w-0 flex-1 items-center gap-2 text-sm">
+                            <input
+                                type="checkbox"
+                                className="size-5 shrink-0 accent-green-600"
+                                checked={ready}
+                                disabled={busy}
+                                onChange={(event) => onReadyChange(event.target.checked)}
+                            />
+                            <span className={ready ? 'text-green-500' : 'text-muted-foreground'}>
+                                Erntereif
+                            </span>
+                        </label>
+                    )}
+                    <div className="ml-auto flex shrink-0 items-center gap-1">
+                        {action}
+                        {editButton}
+                    </div>
+                </div>
             )}
-            {planting.photoStorageKey && (
-                <a
-                    href={photoUrl(planting.photoStorageKey, 'display')}
-                    target="_blank"
-                    rel="noreferrer"
-                    aria-label={`Foto von ${planting.crop}`}
-                    className="size-9 shrink-0 overflow-hidden rounded-md bg-muted"
-                >
-                    <img
-                        src={photoUrl(planting.photoStorageKey)}
-                        alt=""
-                        loading="lazy"
-                        decoding="async"
-                        className="h-full w-full object-cover"
-                    />
-                </a>
-            )}
-            <MemberOnly>
-                {action}
-                <Button
-                    variant="ghost"
-                    size="icon-xs"
-                    type="button"
-                    className="shrink-0"
-                    aria-label={`${planting.crop} ändern`}
-                    onClick={onEdit}
-                >
-                    <Pencil />
-                </Button>
-            </MemberOnly>
         </li>
     )
 }
@@ -694,7 +709,7 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                         <span className="text-xs text-muted-foreground">{cellCount} Felder</span>
                     )}
                 </div>
-                <Button type="button" size="sm" disabled={!canEdit} onClick={() => setDialog({})}>
+                <Button type="button" disabled={!canEdit} onClick={() => setDialog({})}>
                     <Plus />
                     Bepflanzen
                 </Button>
@@ -733,7 +748,6 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                             key={planting.id}
                             bed={bed}
                             planting={planting}
-                            showCells={cellCount > 1}
                             onEdit={() => setDialog({ planting })}
                             onReadyChange={(ready) => readyMutation.mutate({ id: planting.id, ready })}
                             pendingReady={
@@ -745,9 +759,8 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                             action={
                                 <Button
                                     variant="outline"
-                                    size="xs"
                                     type="button"
-                                    className="shrink-0"
+                                    className="shrink-0 px-3"
                                     disabled={clearMutation.isPending}
                                     onClick={() => clearMutation.mutate(planting.id)}
                                 >
@@ -778,7 +791,6 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                             key={planting.id}
                             bed={bed}
                             planting={planting}
-                            showCells={cellCount > 1}
                             onEdit={() => setDialog({ planting })}
                             shown={planting.id === shownId}
                             onShow={() => setShownId(planting.id === shownId ? null : planting.id)}
