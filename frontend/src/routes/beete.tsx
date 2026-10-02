@@ -30,6 +30,7 @@ import {
     deletePlanting,
     getCurrentPlantings,
     getPlantingHistory,
+    plantingFill,
     updatePlanting,
 } from '@/lib/beds'
 import type { Planting } from '@/lib/beds'
@@ -724,12 +725,7 @@ function Beete() {
                     onSelect={(key) =>
                         void navigate({ search: key === bed?.key ? {} : { beet: key }, replace: true })
                     }
-                    cellClass={(bedKey, index) => {
-                        const planting = plantings.find(
-                            (p) => p.bedKey === bedKey && p.cells.includes(index),
-                        )
-                        return planting && cropColour(planting.crop).fill
-                    }}
+                    cellClass={plantingFill(plantings)}
                 />
             </div>
             {error && (

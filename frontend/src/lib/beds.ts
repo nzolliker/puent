@@ -82,11 +82,15 @@ const CROP_COLOURS = [
     { fill: 'fill-lime-600', dot: 'bg-lime-600' },
     { fill: 'fill-orange-600', dot: 'bg-orange-600' },
     { fill: 'fill-teal-600', dot: 'bg-teal-600' },
+    { fill: 'fill-yellow-500', dot: 'bg-yellow-500' },
+    { fill: 'fill-fuchsia-600', dot: 'bg-fuchsia-600' },
+    { fill: 'fill-cyan-600', dot: 'bg-cyan-600' },
+    { fill: 'fill-indigo-500', dot: 'bg-indigo-500' },
 ] as const
 
 /**
  * A colour per crop, worked out from its name, so tomatoes are the same colour
- * in every bed and on every phone without anything being stored. With eight
+ * in every bed and on every phone without anything being stored. With twelve
  * colours two crops will sometimes share one.
  */
 export function cropColour(crop: string) {
@@ -96,4 +100,13 @@ export function cropColour(crop: string) {
     }
 
     return CROP_COLOURS[hash % CROP_COLOURS.length]
+}
+
+/** How the plan colours a cell: by the crop growing in it, or not at all. */
+export function plantingFill(plantings: Planting[]) {
+    return (bedKey: string, index: number) => {
+        const planting = plantings.find((p) => p.bedKey === bedKey && p.cells.includes(index))
+
+        return planting && cropColour(planting.crop).fill
+    }
 }
