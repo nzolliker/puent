@@ -280,8 +280,10 @@ function UploadPanel({
                 />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-2">
+            {/* One below the other: an iPhone's date input does not shrink to
+                half the panel. */}
+            <div className="grid gap-3">
+                <div className="min-w-0 space-y-2">
                     <Label htmlFor="takenAt">Aufgenommen am</Label>
                     <Input
                         id="takenAt"
@@ -290,7 +292,7 @@ function UploadPanel({
                         onChange={(event) => setTakenAt(event.target.value)}
                     />
                 </div>
-                <div className="space-y-2">
+                <div className="min-w-0 space-y-2">
                     <Label htmlFor="album">Album</Label>
                     <select
                         id="album"
