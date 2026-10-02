@@ -81,6 +81,27 @@ change instead of quietly going stale.
 </tr>
 </table>
 
+**Beete**
+- A plan of the plot with every bed on it, drawn to scale. Beds can be
+  rectangles, circles or any polygon, because the real ones are.
+- Each bed is divided into a small grid cut to its shape, so a planting can take
+  a quarter of a bed and something else the rest. What grows there is written
+  on the plan itself, shortened where the patch is small. Tapping a bed opens
+  it; the open bed lives in the URL.
+- A planting is a crop, the cells it takes, the day it went in, a note and
+  optionally one photo — picked from the library or uploaded on the spot.
+- *Abräumen* does not delete it. The planting gets the day it came out and moves
+  to the bed's **Verlauf**, which is how the page answers "what was in here last
+  year". Each entry carries the bed in miniature with its cells filled in, and
+  tapping one shows it on the bed again, so the log says where as well as what.
+  What grew before the app existed can be entered after the fact.
+- A planting can be ticked **Erntereif**. That is the one green on the plan:
+  everything else is drawn in subdued tones, so what can be picked today stands
+  out, and the dashboard names it.
+- Two plantings cannot hold the same cell at once; the dialog greys out what is
+  taken and the server refuses it regardless.
+- The dashboard shows the plan in small, with the same names on it.
+
 **Accounts**
 - The app has no login screen and stores no passwords. Cloudflare Access signs
   people in with a one-time code sent to their e-mail address, before the app
@@ -120,6 +141,9 @@ The honest list, because most of it is visible in the screenshots above:
 - **It only works behind Cloudflare.** The app trusts nothing but an Access
   token, so on the Pi itself `curl localhost:3000` answers `403`, and if the
   tunnel or Cloudflare is down there is no way in from the home network either.
+- **The garden plan is a placeholder.** The beds in `server/garden/layout.ts`
+  are made up, there to have something to draw until the plot has been measured.
+  That is also why there is no screenshot of the page above yet.
 - **The UI language is inconsistent.** The nav and most screens are German, but
   the expenses table is still English, one button says "Submit", and the calendar
   header shows English weekday abbreviations. That screen is the oldest code in
@@ -150,6 +174,29 @@ The frontend reaches the server types through the `@server/*` alias in
 into a type error in the components that use it, not a 404 at runtime. The Zod
 schemas in `server/sharedTypes.ts` travel the same way and validate both the
 request on the server and the form in the browser.
+
+### The garden plan is a file
+
+There is no `beds` table. `server/garden/layout.ts` holds the edge of the plot
+and every bed, in metres from the top-left corner:
+
+```ts
+{ key: "beet-1", name: "Beet 1", shape: "rect", x: 1, y: 1, w: 4, h: 1.5, grid: [4, 2] },
+{ key: "kraeuter", name: "Kräuter", shape: "circle", cx: 7.2, cy: 1.8, r: 1, grid: [2, 2] },
+```
+
+The server reads it to check that a planting names a bed and cells that exist,
+and the browser imports the very same file through `@server/*` to draw the plan
+as SVG — so there is no endpoint for it, nothing to keep in step and nothing to
+run after changing it. It is parsed on import, and a mistake in it stops the
+server from starting.
+
+`grid` is columns by rows laid over the bed's bounding box; cells that fall off a
+triangle or a circle are dropped, and the rest are clipped to the shape
+(`server/garden/geometry.ts`). A planting stores the numbers of its cells, which
+is the one thing to know before editing the file: **a bed whose grid changes
+needs a new `key`**, or the plantings already stored land on different ground.
+Renaming a bed or moving it is free.
 
 ### Where the weather comes from
 
@@ -200,7 +247,9 @@ wrong.
 `bun run test` covers the one thing standing between the internet and the data:
 that a token is only accepted when Cloudflare signed it, for this application,
 and it has not expired — and that the server refuses to start when it has not
-been told where identity comes from.
+been told where identity comes from. It also runs the geometry of the garden
+plan: which cells a triangle or a circle keeps, since a planting stores cell
+numbers and they must not shift.
 
 The other exists because the photo upload broke in four different ways that
 `curl` could not see. Half of that feature runs in the browser — HEIC decoding,
@@ -243,8 +292,10 @@ production, recovery — is in [`DEPLOYMENT.md`](DEPLOYMENT.md).
 
 ## Roadmap
 
-- **Plant & harvest logs** — what went into which bed and when, and what came
-  back out. The part that makes the app useful next year, not just this week.
+- **Harvest log** — the plan knows what went into which bed and when; what came
+  back out is still missing.
+- **The real garden plan** — replace the placeholder layout with the measured
+  plot, and possibly put a drawn picture of it behind the beds.
 - **Per-person expense split** — who owes whom, now that an expense belongs to
   an account rather than to a typed-in name.
 
@@ -358,6 +409,11 @@ address and answers `401` otherwise. Both rules live in one place,
 | `PATCH` | `/api/todos/:id` | tick one off, or put it back (`{ "done": true }`) |
 | `DELETE` | `/api/todos/:id` | remove one |
 | `DELETE` | `/api/albums/:id` | remove an album; its photos move to "Ohne Album" |
+| `GET` | `/api/plantings` | everything growing now, across all beds |
+| `GET` | `/api/plantings/history?bedKey=` | what has been cleared away from one bed, newest first |
+| `POST` | `/api/plantings` | plant cells of a bed — a taken cell is a 409 |
+| `PATCH` | `/api/plantings/:id` | edit one, clear it away (`{ "removedAt": "2026-10-02" }`) or put it back (`null`); `readyAt` marks it ready to harvest the same way |
+| `DELETE` | `/api/plantings/:id` | remove one entered by mistake |
 
 Uploaded files are served outside `/api`, at
 `/uploads/YYYY/MM/<key>.webp` and `/uploads/YYYY/MM/<key>.thumb.webp`.
@@ -368,7 +424,7 @@ Uploaded files are served outside `/api`, at
 <summary>Repo layout</summary>
 
 ```
-server/       Hono app, routes, Drizzle schemas, shared Zod schemas
+server/       Hono app, routes, Drizzle schemas, shared Zod schemas, the garden plan
 frontend/     React app (Vite); `bun run build` outputs to frontend/dist
 drizzle/      generated SQL migrations
 scripts/      demo data and the README screenshot capture

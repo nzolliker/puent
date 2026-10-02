@@ -1,5 +1,5 @@
 import { createRootRoute, Link, Outlet } from '@tanstack/react-router'
-import { Camera, CircleDollarSign, Droplets, House, ListTodo, LogOut } from 'lucide-react'
+import { Camera, CircleDollarSign, Droplets, House, ListTodo, LogOut, Sprout } from 'lucide-react'
 // import { TanStackRouterDevtools } from '@tanstack/react-router-devtools'
 
 import { Button } from '@/components/ui/button'
@@ -44,6 +44,7 @@ const navLinks = [
     { to: '/waterPlants', label: 'Giessen', icon: Droplets },
     { to: '/expenses', label: 'Ausgaben', icon: CircleDollarSign },
     { to: '/aufgaben', label: 'Aufgaben', icon: ListTodo },
+    { to: '/beete', label: 'Beete', icon: Sprout },
     { to: '/fotos', label: 'Fotos', icon: Camera },
 ] as const
 

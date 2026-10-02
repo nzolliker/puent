@@ -5,6 +5,7 @@ import { waterPlantsRoutes } from "./routes/waterPlants";
 import { photosRoutes } from "./routes/photos";
 import { albumsRoutes } from "./routes/albums";
 import { todosRoutes } from "./routes/todos";
+import { plantingsRoutes } from "./routes/plantings";
 import { authRoutes } from "./routes/auth";
 import {
   loadUser,
@@ -62,6 +63,7 @@ const waterPlantsApi = api.route("/water-plants", waterPlantsRoutes);
 const photosApi = api.route("/photos", photosRoutes);
 const albumsApi = api.route("/albums", albumsRoutes);
 const todosApi = api.route("/todos", todosRoutes);
+const plantingsApi = api.route("/plantings", plantingsRoutes);
 //
 
 //const apiRoutes = app.basePath("/api").route("/expenses", expensesRoutes)
@@ -117,4 +119,5 @@ export type ApiRoutes =
   | typeof waterPlantsApi
   | typeof photosApi
   | typeof albumsApi
-  | typeof todosApi;
+  | typeof todosApi
+  | typeof plantingsApi;

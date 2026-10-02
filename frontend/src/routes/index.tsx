@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from '@tanstack/react-router'
+import { createFileRoute, Link, useNavigate } from '@tanstack/react-router'
 import { useCanEdit } from '@/lib/auth'
 
 import {
@@ -15,6 +15,9 @@ import { api } from "@/lib/api"
 import { cn, dayKeyToDate, formatWeekday, getFirstName } from "@/lib/utils"
 import { getPhotos, photoUrl } from "@/lib/photos"
 import { getOpenTodos } from "@/lib/todos"
+import { getCurrentPlantings, isReady } from "@/lib/beds"
+import { GardenMap } from "@/components/garden-map"
+import { gardenLayout } from "@server/garden/layout"
 import { BOOKED_DRY, RAIN_BOOKED, RAIN_OPEN, rainLabel } from "@/lib/rain"
 
 export const Route = createFileRoute('/')({
@@ -196,6 +199,13 @@ function Index() {
     // Same key as the Aufgaben page, so ticking a job off there updates this card.
     const { isPending: todosIsPending, data: todoData } = useQuery({ queryKey: ['get-open-todos'], queryFn: getOpenTodos })
 
+    // Same key as the Beete page, so planting something there updates this card.
+    const { data: plantingData } = useQuery({ queryKey: ['get-plantings'], queryFn: getCurrentPlantings })
+    const navigate = useNavigate()
+    // Each crop once, however many beds it is in.
+    const crops = [...new Set((plantingData?.plantings ?? []).map((planting) => planting.crop))]
+    const readyCrops = [...new Set((plantingData?.plantings ?? []).filter(isReady).map((planting) => planting.crop))]
+
     if (totalSpentError) return 'An error has occurred: ' + totalSpentError.message
     if (overviewError) return 'An error has occurred: ' + overviewError.message
 
@@ -249,6 +259,39 @@ function Index() {
                             <Link to="/aufgaben" className="hover:underline">
                                 {todoData.todos.length} offen
                             </Link>
+                        </CardFooter>
+                    )}
+                </Card>
+            </div>
+            <div className='mr-2 ml-2'>
+                <Card className="w-full max-w-sm m-auto mt-3">
+                    <CardHeader>
+                        <CardTitle>Beete</CardTitle>
+                        <CardDescription>Was gerade wächst:</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {/* Drawn from the layout file, so it needs no loading
+                            state: the plan is there at once and the crops
+                            follow. A tap opens that bed. */}
+                        <GardenMap
+                            layout={gardenLayout}
+                            onSelect={(key) => void navigate({ to: '/beete', search: { beet: key } })}
+                            plantings={plantingData?.plantings}
+                        />
+                    </CardContent>
+                    {plantingData && (
+                        <CardFooter className="text-sm text-muted-foreground">
+                            {/* What can be picked comes first: it is the reason
+                                to go and look. */}
+                            {readyCrops.length ? (
+                                <Link to="/beete" className="truncate text-green-500 hover:underline">
+                                    Erntereif: {readyCrops.join(', ')}
+                                </Link>
+                            ) : (
+                                <Link to="/beete" className="truncate hover:underline">
+                                    {crops.length ? crops.join(', ') : 'Noch nichts gepflanzt'}
+                                </Link>
+                            )}
                         </CardFooter>
                     )}
                 </Card>

@@ -9,7 +9,7 @@
  *
  *   bun run demo-data
  *
- * This DELETES the rows in waterPlants, expenses, todos, albums and
+ * This DELETES the rows in waterPlants, expenses, todos, plantings, albums and
  * weatherDays, so it refuses to run against anything but a database on
  * localhost. Photos are left alone -- their rows point at files in uploads/
  * that this script cannot invent.
@@ -26,6 +26,9 @@
  */
 import 'dotenv/config'
 import mysql from 'mysql2/promise'
+
+import { bedCells } from '../server/garden/geometry.ts'
+import { gardenLayout } from '../server/garden/layout.ts'
 
 const url = process.env.DATABASE_URL
 if (!url) {
@@ -99,6 +102,32 @@ const TODOS_DONE = [
   ['Laub vom Weg räumen', '2026-09-06 10:20:00'],
   ['Beet 1 mulchen', '2026-09-13 16:45:00'],
   ['Giesskanne ersetzen', '2026-09-21 09:05:00'],
+]
+
+/**
+ * What grows where, and what was cleared away before it.
+ *
+ * Written against a bed's place in the layout and a share of its cells rather
+ * than against keys and cell numbers, so the seed keeps working when
+ * server/garden/layout.ts is redrawn. A bed the layout does not have, or a
+ * share that rounds to no cell, is skipped.
+ *
+ * [bed, crop, from, to, planted, removed, note, ready] -- `from` and `to` are
+ * fractions of the bed's cells, and the ones still growing in one bed must not
+ * overlap. `ready` is the day it became ready to harvest: two of them are, so
+ * the plan has its green to show.
+ */
+const PLANTINGS = [
+  [0, 'Tomaten', 0, 0.5, '2026-05-14', null, 'San Marzano', '2026-09-20'],
+  [0, 'Basilikum', 0.5, 0.75, '2026-05-20', null, null],
+  [0, 'Spinat', 0, 0.5, '2026-03-08', '2026-05-10', null],
+  [0, 'Radieschen', 0.5, 1, '2026-03-22', '2026-05-16', 'Schnecken haben die Hälfte geholt'],
+  [1, 'Salat', 0, 0.67, '2026-08-02', null, 'Lollo rosso', '2026-09-28'],
+  [1, 'Erbsen', 0, 1, '2026-04-04', '2026-07-20', null],
+  [2, 'Kürbis', 0, 1, '2026-05-25', null, null],
+  [3, 'Salbei', 0, 0.25, '2025-04-12', null, null],
+  [3, 'Schnittlauch', 0.25, 0.5, '2025-04-12', null, null],
+  [4, 'Zucchetti', 0, 0.67, '2026-05-25', null, null],
 ]
 
 /**
@@ -207,6 +236,31 @@ try {
   ]
   await db.query('INSERT INTO `todos` (`title`, `completed_at`) VALUES ?', [todos])
   console.log(`  todos        ${todos.length} rows (${TODOS_OPEN.length} still open)`)
+
+  await db.query('DELETE FROM `plantings`')
+  const plantings = PLANTINGS.flatMap(([bedIndex, crop, from, to, plantedAt, removedAt, note, readyAt = null]) => {
+    const bed = gardenLayout.beds[bedIndex]
+    if (!bed) return []
+
+    const cells = bedCells(bed).map((cell) => cell.index)
+    // The same rounding at both ends, so two shares that meet at 0.5 never
+    // claim the same cell.
+    const share = cells.slice(Math.round(from * cells.length), Math.round(to * cells.length))
+    if (share.length === 0) return []
+
+    return [[bed.key, JSON.stringify(share), crop, note, plantedAt, removedAt, readyAt, 'Anna Brunner']]
+  })
+  if (plantings.length > 0) {
+    await db.query(
+      'INSERT INTO `plantings` (`bed_key`, `cells`, `crop`, `note`, `planted_at`, `removed_at`, `ready_at`, `created_by`) VALUES ?',
+      [plantings],
+    )
+    await db.query(
+      'UPDATE `plantings` p JOIN `users` u ON u.`name` = p.`created_by` SET p.`user_id` = u.`id`',
+    )
+  }
+  const growing = plantings.filter(([, , , , , removedAt]) => removedAt === null).length
+  console.log(`  plantings    ${plantings.length} rows (${growing} still growing)`)
 
   await db.query('DELETE FROM `weatherDays`')
   const rain = [

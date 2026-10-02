@@ -1,0 +1,1 @@
+ALTER TABLE `plantings` ADD `ready_at` date;

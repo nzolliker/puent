@@ -29,6 +29,8 @@ import sharp from 'sharp'
 import { mkdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
+import { gardenLayout } from '../server/garden/layout.ts'
+
 const BASE = process.env.BASE ?? 'http://localhost:3000'
 const OUT = process.env.OUT ?? 'docs/screenshots'
 const EMAIL = process.env.SHOT_EMAIL ?? 'anna@example.com'
@@ -86,6 +88,15 @@ const shots = [
     prepare: (page) => page.getByRole('button', { name: 'Verlauf' }).click(),
     ready: (page) => page.getByRole('dialog').waitFor(),
     cropTo: '[role=dialog]',
+  },
+  {
+    file: '10-beete.webp',
+    // The first bed of the layout, whatever it is called: the seed plants it
+    // and clears things away from it, so both lists have something in them.
+    path: `/beete?beet=${gardenLayout.beds[0].key}`,
+    // The log is the last thing to arrive; the plan and the lists are there
+    // by then.
+    ready: (page) => page.getByText(/–/).first().waitFor(),
   },
   {
     file: '09-nur-lesen.webp',
