@@ -526,7 +526,6 @@ function PlantingDialog({
 function PlantingRow({
     bed,
     planting,
-    showCells,
     onEdit,
     action,
     shown,
@@ -537,8 +536,6 @@ function PlantingRow({
 }: {
     bed: Bed
     planting: Planting
-    /** Off for a bed without a grid, where "1 Feld" says nothing. */
-    showCells: boolean
     onEdit: () => void
     action?: ReactNode
     /** Whether this is the planting the bed above is showing. */
@@ -561,7 +558,6 @@ function PlantingRow({
         planting.removedAt
             ? `${formatDay(planting.plantedAt)} – ${formatDay(planting.removedAt)}`
             : `seit ${formatDay(planting.plantedAt)}`,
-        showCells && (planting.cells.length === 1 ? '1 Feld' : `${planting.cells.length} Felder`),
         // Here rather than beside the checkbox, where it would not fit a
         // phone -- and here a guest, who gets no checkbox, reads it too.
         isReady(planting) && planting.readyAt && (
@@ -752,7 +748,6 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                             key={planting.id}
                             bed={bed}
                             planting={planting}
-                            showCells={cellCount > 1}
                             onEdit={() => setDialog({ planting })}
                             onReadyChange={(ready) => readyMutation.mutate({ id: planting.id, ready })}
                             pendingReady={
@@ -796,7 +791,6 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                             key={planting.id}
                             bed={bed}
                             planting={planting}
-                            showCells={cellCount > 1}
                             onEdit={() => setDialog({ planting })}
                             shown={planting.id === shownId}
                             onShow={() => setShownId(planting.id === shownId ? null : planting.id)}
