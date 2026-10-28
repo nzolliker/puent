@@ -3,7 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <link rel="icon" type="image/png" href="/favicon.png" />
-    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <!--
+      From GitHub rather than from here: iOS fetches the home-screen icon
+      without the Cloudflare Access cookie, so /apple-touch-icon.png only gets
+      the login page back and the icon falls back to a letter. The repo is
+      public, so this works as long as it stays public.
+    -->
+    <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/nzolliker/puent/main/frontend/public/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Pünt" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pünt</title>
