@@ -1,8 +1,11 @@
-import { useId } from 'react'
-import type { KeyboardEvent } from 'react'
+import { useEffect, useId, useRef, useState } from 'react'
+import type { KeyboardEvent, PointerEvent as ReactPointerEvent } from 'react'
+import { Minus, Plus, RotateCcw } from 'lucide-react'
 
-import { bedBounds, bedCells, labelSlot, planViewBox } from '@server/garden/geometry'
+import { bedBounds, bedCells, labelSlot, planViewBox, plantingOutline } from '@server/garden/geometry'
+import type { Rect } from '@server/garden/geometry'
 import type { Bed, GardenLayout } from '@server/garden/schema'
+import { Button } from '@/components/ui/button'
 import { plantingColour } from '@/lib/beds'
 import { cn } from '@/lib/utils'
 
@@ -110,7 +113,7 @@ function BedGrid({
                             height={cell.h}
                             vectorEffect="non-scaling-stroke"
                             className={cn(
-                                'stroke-muted-foreground/40',
+                                'stroke-muted-foreground/20',
                                 // Transparent rather than none: a cell with no
                                 // fill does not receive the tap.
                                 isSelected
@@ -137,6 +140,19 @@ function BedGrid({
                         />
                     )
                 })}
+                {/* Around each planting, so two crops side by side are told
+                    apart by the edge between them rather than by colour.
+                    Inside the clip, so it follows a round bed's edge. */}
+                {plantings.map((planting) => (
+                    <path
+                        key={planting.id}
+                        d={plantingOutline(bed, planting.cells)}
+                        vectorEffect="non-scaling-stroke"
+                        strokeWidth={1.5}
+                        strokeLinecap="square"
+                        className={cn('pointer-events-none fill-none stroke-foreground/70', ghost && 'opacity-50')}
+                    />
+                ))}
             </g>
             {/* Drawn last and unclipped: a clipped edge would lose half its width. */}
             <BedShape
@@ -154,9 +170,10 @@ function BedGrid({
                 if (!name) return null
 
                 return (
-                    // White with a dark edge, so it reads on every crop
-                    // colour. The edge is in the SVG's units on purpose --
-                    // it has to scale with the letters.
+                    // Dark with an edge in the page's colour, so it reads on
+                    // the pale tones and on the green alike. The edge is in
+                    // the SVG's units on purpose -- it has to scale with the
+                    // letters.
                     <text
                         key={planting.id}
                         x={slot.x + slot.w / 2}
@@ -164,10 +181,10 @@ function BedGrid({
                         fontSize={fontSize}
                         textAnchor="middle"
                         dominantBaseline="central"
-                        strokeWidth={fontSize * 0.18}
+                        strokeWidth={fontSize * 0.22}
                         strokeLinejoin="round"
                         paintOrder="stroke"
-                        className="pointer-events-none fill-white stroke-black/50 select-none"
+                        className="pointer-events-none fill-foreground stroke-background/80 select-none"
                     >
                         {name}
                     </text>
@@ -177,6 +194,61 @@ function BedGrid({
     )
 }
 
+/** How far in the plan goes: a sixth of it fills the screen. */
+const MAX_SCALE = 6
+/** What one tap on + or − does. */
+const STEP = 1.5
+/** A pointer that moved further than this, in pixels, was a drag, not a tap. */
+const TAP_SLOP = 6
+
+/** How far in, and which point of the plan is in the middle. In metres. */
+type Zoom = { scale: number; cx: number; cy: number }
+
+const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value))
+
+/** Keeps the zoom in range and the visible part on the plan. */
+function clampZoom(view: Rect, zoom: Zoom): Zoom {
+    const scale = clamp(zoom.scale, 1, MAX_SCALE)
+    const halfW = view.w / scale / 2
+    const halfH = view.h / scale / 2
+
+    return {
+        scale,
+        cx: clamp(zoom.cx, view.x + halfW, view.x + view.w - halfW),
+        cy: clamp(zoom.cy, view.y + halfH, view.y + view.h - halfH),
+    }
+}
+
+function visibleRect(view: Rect, zoom: Zoom): Rect {
+    const w = view.w / zoom.scale
+    const h = view.h / zoom.scale
+
+    return { x: zoom.cx - w / 2, y: zoom.cy - h / 2, w, h }
+}
+
+/**
+ * Zooms by `factor` around a point of the plan, which stays where it is on
+ * the screen -- the point between the fingers, or under the cursor.
+ */
+function zoomAround(view: Rect, zoom: Zoom, factor: number, x: number, y: number): Zoom {
+    const before = visibleRect(view, zoom)
+    const scale = clamp(zoom.scale * factor, 1, MAX_SCALE)
+    const w = view.w / scale
+    const h = view.h / scale
+    const left = x - ((x - before.x) / before.w) * w
+    const top = y - ((y - before.y) / before.h) * h
+
+    return clampZoom(view, { scale, cx: left + w / 2, cy: top + h / 2 })
+}
+
+/**
+ * The plan of the garden, zoomable: pinch and drag on a phone, the wheel or a
+ * trackpad pinch on a computer, and buttons for either.
+ *
+ * The zoom changes the viewBox rather than scaling the picture, so the lines
+ * stay sharp and the letters stay the same size on screen. Zoomed in, a name
+ * has more room and is no longer cut short.
+ */
 export function GardenMap({
     layout,
     selectedKey,
@@ -193,67 +265,232 @@ export function GardenMap({
 }) {
     const clipPrefix = useClipPrefix()
     const view = planViewBox(layout)
-    // In metres like everything else, so the names scale with the plan.
-    const cropSize = view.w / 38
-    const captionSize = view.w / 42
+    const svgRef = useRef<SVGSVGElement>(null)
+
+    const [zoom, setZoomState] = useState<Zoom>(() => ({
+        scale: 1,
+        cx: view.x + view.w / 2,
+        cy: view.y + view.h / 2,
+    }))
+    // Mirrored, so that several pointer events between two renders build on
+    // each other instead of on the same stale state.
+    const zoomRef = useRef(zoom)
+    const setZoom = (next: Zoom) => {
+        zoomRef.current = next
+        setZoomState(next)
+    }
+
+    const visible = visibleRect(view, zoom)
+    // In metres like everything else, so they grow with the plan at scale 1
+    // and stay that size on screen when zoomed.
+    const cropSize = view.w / 32 / zoom.scale
+    const captionSize = view.w / 36 / zoom.scale
+
+    /** Where on the plan a point of the screen is. */
+    const toPlan = (clientX: number, clientY: number) => {
+        const box = svgRef.current!.getBoundingClientRect()
+        const shown = visibleRect(view, zoomRef.current)
+
+        return {
+            x: shown.x + ((clientX - box.left) / box.width) * shown.w,
+            y: shown.y + ((clientY - box.top) / box.height) * shown.h,
+        }
+    }
+    /** How many metres one pixel is, at the current zoom. */
+    const metresPerPixel = () => visibleRect(view, zoomRef.current).w / svgRef.current!.getBoundingClientRect().width
+
+    const gesture = useRef({
+        pointers: new Map<number, { x: number; y: number }>(),
+        travelled: 0,
+        /** Set once a gesture has moved far enough; the click after it is not a tap. */
+        dragged: false,
+    })
+
+    const onPointerDown = (event: ReactPointerEvent<SVGSVGElement>) => {
+        const g = gesture.current
+        if (g.pointers.size === 0) {
+            g.travelled = 0
+            g.dragged = false
+        }
+        g.pointers.set(event.pointerId, { x: event.clientX, y: event.clientY })
+    }
+
+    const onPointerMove = (event: ReactPointerEvent<SVGSVGElement>) => {
+        const g = gesture.current
+        const last = g.pointers.get(event.pointerId)
+        if (!last) return
+
+        const current = { x: event.clientX, y: event.clientY }
+        const others = [...g.pointers].filter(([id]) => id !== event.pointerId).map(([, point]) => point)
+
+        g.travelled += Math.hypot(current.x - last.x, current.y - last.y)
+        if (!g.dragged && g.travelled > TAP_SLOP) {
+            g.dragged = true
+            // Only now: captured from the start, the tap on a bed would land
+            // on the plan instead of on the bed.
+            svgRef.current?.setPointerCapture(event.pointerId)
+        }
+
+        if (others.length === 1) {
+            // Pinch: the gap between the fingers is the zoom, and the point
+            // between them moves the plan along with them.
+            const other = others[0]!
+            const factor = Math.hypot(current.x - other.x, current.y - other.y) / Math.hypot(last.x - other.x, last.y - other.y)
+            const mpp = metresPerPixel()
+            const panned = clampZoom(view, {
+                ...zoomRef.current,
+                cx: zoomRef.current.cx - ((current.x - last.x) / 2) * mpp,
+                cy: zoomRef.current.cy - ((current.y - last.y) / 2) * mpp,
+            })
+            zoomRef.current = panned
+            const middle = toPlan((current.x + other.x) / 2, (current.y + other.y) / 2)
+            if (Number.isFinite(factor) && factor > 0) {
+                setZoom(zoomAround(view, panned, factor, middle.x, middle.y))
+            } else {
+                setZoom(panned)
+            }
+        } else if (others.length === 0 && g.dragged && zoomRef.current.scale > 1) {
+            const mpp = metresPerPixel()
+            setZoom(
+                clampZoom(view, {
+                    ...zoomRef.current,
+                    cx: zoomRef.current.cx - (current.x - last.x) * mpp,
+                    cy: zoomRef.current.cy - (current.y - last.y) * mpp,
+                }),
+            )
+        }
+
+        g.pointers.set(event.pointerId, current)
+    }
+
+    const onPointerEnd = (event: ReactPointerEvent<SVGSVGElement>) => {
+        gesture.current.pointers.delete(event.pointerId)
+    }
+
+    // The wheel needs a listener that is not passive, or it cannot keep the
+    // page from scrolling. Zoomed out, a plain wheel still scrolls the page;
+    // a trackpad pinch (which arrives as a wheel with ctrl held) zooms.
+    useEffect(() => {
+        const svg = svgRef.current
+        if (!svg) return
+
+        const onWheel = (event: WheelEvent) => {
+            if (!event.ctrlKey && zoomRef.current.scale === 1) return
+            event.preventDefault()
+
+            const factor = Math.exp(-event.deltaY * (event.ctrlKey ? 0.01 : 0.002))
+            const point = toPlan(event.clientX, event.clientY)
+            setZoom(zoomAround(view, zoomRef.current, factor, point.x, point.y))
+        }
+
+        svg.addEventListener('wheel', onWheel, { passive: false })
+        return () => svg.removeEventListener('wheel', onWheel)
+        // view comes from the layout, which does not change while mounted.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [])
+
+    const zoomBy = (factor: number) => setZoom(zoomAround(view, zoomRef.current, factor, zoomRef.current.cx, zoomRef.current.cy))
+    const reset = () => setZoom(clampZoom(view, { scale: 1, cx: 0, cy: 0 }))
+
+    const select = (key: string) => {
+        // The click that ends a drag or a pinch is not a tap on a bed.
+        if (gesture.current.dragged) return
+        onSelect(key)
+    }
 
     return (
-        <svg
-            viewBox={`${view.x} ${view.y} ${view.w} ${view.h}`}
-            className={cn('h-auto w-full', className)}
-            role="group"
-            aria-label="Lageplan"
-        >
-            <polygon
-                points={layout.outline.map((point) => point.join(',')).join(' ')}
-                vectorEffect="non-scaling-stroke"
-                className="fill-card stroke-border"
-            />
-            {layout.beds.map((bed) => {
-                const bounds = bedBounds(bed)
+        <div className={cn('relative overflow-hidden', className)}>
+            <svg
+                ref={svgRef}
+                viewBox={`${visible.x} ${visible.y} ${visible.w} ${visible.h}`}
+                className="block h-auto w-full select-none"
+                // Zoomed out, a finger still scrolls the page; zoomed in, it
+                // moves the plan. Pinching is the plan's either way.
+                style={{ touchAction: zoom.scale > 1 ? 'none' : 'pan-y' }}
+                role="group"
+                aria-label="Lageplan"
+                onPointerDown={onPointerDown}
+                onPointerMove={onPointerMove}
+                onPointerUp={onPointerEnd}
+                onPointerCancel={onPointerEnd}
+            >
+                <polygon
+                    points={layout.outline.map((point) => point.join(',')).join(' ')}
+                    vectorEffect="non-scaling-stroke"
+                    className="fill-card stroke-border"
+                />
+                {layout.beds.map((bed) => {
+                    const bounds = bedBounds(bed)
 
-                return (
-                    <g
-                        key={bed.key}
-                        role="button"
-                        tabIndex={0}
-                        aria-label={bed.name}
-                        aria-pressed={bed.key === selectedKey}
-                        className="group cursor-pointer outline-none"
-                        onClick={() => onSelect(bed.key)}
-                        onKeyDown={(event) => {
-                            if (event.key === 'Enter' || event.key === ' ') {
-                                event.preventDefault()
-                                onSelect(bed.key)
-                            }
-                        }}
-                    >
-                        <title>{bed.name}</title>
-                        <BedGrid
-                            bed={bed}
-                            clipId={`${clipPrefix}-${bed.key}`}
-                            selected={bed.key === selectedKey}
-                            plantings={plantings.filter((planting) => planting.bedKey === bed.key)}
-                            fontSize={cropSize}
-                        />
-                        {/* Above the bed, because the inside belongs to
-                            what is growing there. */}
-                        <text
-                            x={bounds.x + bounds.w / 2}
-                            y={bounds.y - captionSize * 0.45}
-                            fontSize={captionSize}
-                            textAnchor="middle"
-                            className={cn(
-                                'pointer-events-none select-none',
-                                bed.key === selectedKey ? 'fill-foreground' : 'fill-muted-foreground',
-                            )}
+                    return (
+                        <g
+                            key={bed.key}
+                            role="button"
+                            tabIndex={0}
+                            aria-label={bed.name}
+                            aria-pressed={bed.key === selectedKey}
+                            className="group cursor-pointer outline-none"
+                            onClick={() => select(bed.key)}
+                            onKeyDown={(event) => {
+                                if (event.key === 'Enter' || event.key === ' ') {
+                                    event.preventDefault()
+                                    onSelect(bed.key)
+                                }
+                            }}
                         >
-                            {bed.name}
-                        </text>
-                    </g>
-                )
-            })}
-        </svg>
+                            <title>{bed.name}</title>
+                            <BedGrid
+                                bed={bed}
+                                clipId={`${clipPrefix}-${bed.key}`}
+                                selected={bed.key === selectedKey}
+                                plantings={plantings.filter((planting) => planting.bedKey === bed.key)}
+                                fontSize={cropSize}
+                            />
+                            {/* Above the bed, because the inside belongs to
+                                what is growing there. */}
+                            <text
+                                x={bounds.x + bounds.w / 2}
+                                y={bounds.y - captionSize * 0.45}
+                                fontSize={captionSize}
+                                textAnchor="middle"
+                                className={cn(
+                                    'pointer-events-none select-none',
+                                    bed.key === selectedKey ? 'fill-foreground' : 'fill-muted-foreground',
+                                )}
+                            >
+                                {bed.name}
+                            </text>
+                        </g>
+                    )
+                })}
+            </svg>
+            {/* Bottom right, where the plot's slope leaves the plan empty. */}
+            <div className="absolute right-1 bottom-1 flex gap-1">
+                {zoom.scale > 1 && (
+                    <Button variant="outline" size="icon" aria-label="Ganzen Plan zeigen" onClick={reset}>
+                        <RotateCcw />
+                    </Button>
+                )}
+                <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Verkleinern"
+                    disabled={zoom.scale <= 1}
+                    onClick={() => zoomBy(1 / STEP)}
+                >
+                    <Minus />
+                </Button>
+                <Button
+                    variant="outline"
+                    size="icon"
+                    aria-label="Vergrössern"
+                    disabled={zoom.scale >= MAX_SCALE}
+                    onClick={() => zoomBy(STEP)}
+                >
+                    <Plus />
+                </Button>
+            </div>
+        </div>
     )
 }
 
@@ -350,6 +587,12 @@ export function BedThumb({
                             className={colourClass}
                         />
                     ))}
+                {/* The tones are pale, so the edge is what shows where. */}
+                <path
+                    d={plantingOutline(bed, cells)}
+                    vectorEffect="non-scaling-stroke"
+                    className="fill-none stroke-foreground/70"
+                />
             </g>
             <BedShape bed={bed} className="fill-none stroke-muted-foreground" />
         </svg>

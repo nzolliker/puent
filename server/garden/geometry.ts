@@ -189,3 +189,35 @@ export function labelSlot(bed: Bed, cells: readonly number[]): Rect | null {
     h: last.y + last.h - first.y,
   };
 }
+
+/**
+ * The edge around a planting's cells, as SVG path data: every side of one of
+ * its cells that does not border another of its cells. The sides between two
+ * of its own cells are left out, so an L or two separate patches each get one
+ * clean outline instead of a grid.
+ *
+ * Empty when none of the cells exist in this bed.
+ */
+export function plantingOutline(bed: Bed, cells: readonly number[]): string {
+  const [cols] = bed.grid;
+  const wanted = new Set(cells);
+  const own = bedCells(bed).filter((cell) => wanted.has(cell.index));
+  const has = new Set(own.map((cell) => cell.index));
+
+  const segments: string[] = [];
+  const line = (x1: number, y1: number, x2: number, y2: number) =>
+    segments.push(`M${x1} ${y1}L${x2} ${y2}`);
+
+  for (const cell of own) {
+    const col = cell.index % cols;
+    const right = cell.x + cell.w;
+    const bottom = cell.y + cell.h;
+
+    if (!has.has(cell.index - cols)) line(cell.x, cell.y, right, cell.y);
+    if (!has.has(cell.index + cols)) line(cell.x, bottom, right, bottom);
+    if (col === 0 || !has.has(cell.index - 1)) line(cell.x, cell.y, cell.x, bottom);
+    if (col === cols - 1 || !has.has(cell.index + 1)) line(right, cell.y, right, bottom);
+  }
+
+  return segments.join("");
+}

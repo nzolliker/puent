@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 
-import { bedBounds, bedCells, labelSlot, planViewBox } from "./geometry";
+import { bedBounds, bedCells, labelSlot, planViewBox, plantingOutline } from "./geometry";
 import { gardenLayout } from "./layout";
 import { bedSchema, gardenLayoutSchema } from "./schema";
 
@@ -141,5 +141,46 @@ describe("the layout in layout.ts", () => {
       expect(bounds.x + bounds.w).toBeLessThanOrEqual(view.x + view.w);
       expect(bounds.y + bounds.h).toBeLessThanOrEqual(view.y + view.h);
     }
+  });
+});
+
+describe("plantingOutline", () => {
+  // 4 columns by 2 rows, each cell 1 m wide and 0.5 m high, from (1, 2).
+  const bed = bedSchema.parse({
+    key: "r",
+    name: "R",
+    shape: "rect",
+    x: 1,
+    y: 2,
+    w: 4,
+    h: 1,
+    grid: [4, 2],
+  });
+
+  const segments = (path: string) => path.split("M").filter(Boolean).sort();
+
+  test("a block gets its outside edges and none between its own cells", () => {
+    // Columns 1 and 2 of both rows.
+    expect(segments(plantingOutline(bed, [1, 2, 5, 6]))).toEqual(
+      [
+        "2 2L3 2",
+        "3 2L4 2",
+        "2 3L3 3",
+        "3 3L4 3",
+        "2 2L2 2.5",
+        "2 2.5L2 3",
+        "4 2L4 2.5",
+        "4 2.5L4 3",
+      ].sort(),
+    );
+  });
+
+  test("cells at the end of a row do not join the next row's first cell", () => {
+    // The last cell of the top row and the first of the bottom row.
+    expect(segments(plantingOutline(bed, [3, 4]))).toHaveLength(8);
+  });
+
+  test("nothing for cells the bed does not have", () => {
+    expect(plantingOutline(bed, [99])).toBe("");
   });
 });
