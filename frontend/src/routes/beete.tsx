@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Images, Loader2, Pencil, Plus, Upload, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { ZoomableImage } from '@/components/zoomable-image'
 import { MemberOnly, ReadOnlyNotice } from '@/components/access'
 import { BedThumb, BedView, GardenMap } from '@/components/garden-map'
 import { useCanEdit } from '@/lib/auth'
@@ -648,7 +649,7 @@ function PlantingRow({
                                 <DialogHeader>
                                     <DialogTitle>{planting.crop}</DialogTitle>
                                 </DialogHeader>
-                                <img
+                                <ZoomableImage
                                     src={photoUrl(planting.photoStorageKey, 'display')}
                                     alt={planting.crop}
                                     className="max-h-[70dvh] w-full rounded-md object-contain"
