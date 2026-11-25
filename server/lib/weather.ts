@@ -31,7 +31,7 @@ import { weatherDays } from "../db/schema/weather";
  */
 export function defaultRainThresholdMm() {
   const value = Number(process.env.RAIN_THRESHOLD_MM);
-  return Number.isFinite(value) && value > 0 ? value : 2;
+  return Number.isFinite(value) && value > 0 ? value : 5;
 }
 
 /**

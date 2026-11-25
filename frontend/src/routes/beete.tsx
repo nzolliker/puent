@@ -162,7 +162,7 @@ function PhotoField({
                     <Button
                         type="button"
                         variant="outline"
-                       
+
                         aria-expanded={libraryOpen}
                         onClick={() => setLibraryOpen((open) => !open)}
                     >
@@ -172,7 +172,7 @@ function PhotoField({
                     <Button
                         type="button"
                         variant="outline"
-                       
+
                         disabled={uploadMutation.isPending}
                         onClick={() => inputRef.current?.click()}
                     >
@@ -711,7 +711,7 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                 </div>
                 <Button type="button" disabled={!canEdit} onClick={() => setDialog({})}>
                     <Plus />
-                    Bepflanzen
+                    Neue Pflanze setzen
                 </Button>
             </div>
 
@@ -764,7 +764,7 @@ function BedPanel({ bed, current }: { bed: Bed; current: Planting[] }) {
                                     disabled={clearMutation.isPending}
                                     onClick={() => clearMutation.mutate(planting.id)}
                                 >
-                                    Abräumen
+                                    Geerntet
                                 </Button>
                             }
                         />
