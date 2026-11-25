@@ -255,6 +255,43 @@ Sessions are Cloudflare's. How long somebody stays signed in is the session
 duration on the Access application, and separately the global session timeout
 under Zero Trust → Settings → Authentication, which defaults to 24 hours.
 
+### Public files for the installed app
+
+Pünt is installable as a web app (manifest, icons, service worker), and on the
+iPhone that is the only way it can receive push notifications. Browsers fetch
+the manifest and its icons **without** the Access cookie, so these four paths
+have to get past Access without a sign-in:
+
+- `/manifest.webmanifest`
+- `/sw.js`
+- `/icon-192.png`
+- `/icon-512.png`
+
+The app lets exactly these through without a token (`PUBLIC_PATHS` in
+`server/lib/access.ts`). Cloudflare needs the same exception, or the requests
+are answered with the sign-in page before they reach the Pi:
+
+1. Zero Trust → Access → Applications → Add an application → Self-hosted.
+2. Name it e.g. "Pünt public files". Add one destination per path above: the
+   same hostname as the main application, with the path filled in
+   (`manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png`).
+3. One policy: action **Bypass**, include **Everyone**.
+
+Access picks the most specific application for a path, so these four bypass
+while everything else stays behind the main application. None of them carries
+data. Keep the list in sync with `PUBLIC_PATHS`: a path on only one side is
+either still blocked or, the other way round, reaches the app without a token
+and gets `403`.
+
+Checking it, from a private browser window that is not signed in:
+`https://<hostname>/manifest.webmanifest` shows the JSON, while
+`https://<hostname>/` still shows the Cloudflare sign-in page.
+
+An icon that was added to the home screen **before** the manifest existed
+keeps opening the old way. Remove it and add Pünt again (Share → Add to Home
+Screen on the iPhone, menu → Install app / Add to Home screen in Chrome on
+Android).
+
 ### Letting someone in
 
 1. Add their e-mail address to the Access policy (Zero Trust → Access →

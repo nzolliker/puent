@@ -11,6 +11,14 @@
     -->
     <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/nzolliker/puent/main/frontend/public/apple-touch-icon.png" />
     <meta name="apple-mobile-web-app-title" content="Pünt" />
+    <!--
+      Makes Pünt installable and, on the iPhone, the only way it can receive
+      push notifications. This file and the icons it names are exempt from the
+      Access check (server/lib/access.ts, PUBLIC_PATHS), since browsers fetch
+      them without the Access cookie.
+    -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="theme-color" content="#0a0a0a" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Pünt</title>
   </head>
