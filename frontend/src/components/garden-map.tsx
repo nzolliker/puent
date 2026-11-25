@@ -281,10 +281,10 @@ export function GardenMap({
     }
 
     const visible = visibleRect(view, zoom)
-    // In metres like everything else, so at scale 1 the names are as large
-    // as they always were, and stay that size on screen when zoomed.
-    const cropSize = view.w / 38 / zoom.scale
-    const captionSize = view.w / 42 / zoom.scale
+    // In metres like everything else, so they grow with the plan at scale 1
+    // and stay that size on screen when zoomed.
+    const cropSize = view.w / 32 / zoom.scale
+    const captionSize = view.w / 36 / zoom.scale
 
     /** Where on the plan a point of the screen is. */
     const toPlan = (clientX: number, clientY: number) => {
