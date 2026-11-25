@@ -79,25 +79,26 @@ export function isReady(planting: { readyAt?: string | null; removedAt?: string 
 }
 
 /** The one green on the plan: this can be harvested. */
-const READY_FILL = 'fill-green-500'
+const READY_FILL = 'fill-green-600'
 
 /**
- * Everything else. Subdued on purpose and with no green among them, so that
- * nothing on the plan competes with what is ready. Still more than one tone,
- * because two crops side by side have to be told apart.
+ * Everything else. Faint tints over the dark page, on purpose, and no green
+ * among them, so that nothing on the plan competes with what is ready. The edge drawn around each
+ * planting is what tells two crops apart; the tone only helps to recognise a
+ * crop again, so it does not matter when two share one.
  *
  * Written out in full because Tailwind scans source text -- a class built by
  * string concatenation at runtime would never make it into the stylesheet.
  */
 const PLAIN_FILLS = [
-    'fill-slate-500',
-    'fill-stone-500',
-    'fill-sky-900',
-    'fill-indigo-900',
-    'fill-violet-900',
-    'fill-rose-900',
-    'fill-orange-900',
-    'fill-amber-900',
+    'fill-slate-300/25',
+    'fill-stone-300/25',
+    'fill-sky-300/25',
+    'fill-indigo-300/25',
+    'fill-violet-300/25',
+    'fill-rose-300/25',
+    'fill-orange-300/25',
+    'fill-amber-300/25',
 ] as const
 
 /**

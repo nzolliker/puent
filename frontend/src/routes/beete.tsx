@@ -845,7 +845,7 @@ function Beete() {
             </div>
             {/* What the one green on the plan means. */}
             <div className="mt-1.5 flex items-center gap-1.5 px-1 text-xs text-muted-foreground">
-                <span className="size-2.5 rounded-sm bg-green-500" />
+                <span className="size-2.5 rounded-sm bg-green-600" />
                 erntereif
             </div>
             {error && (
