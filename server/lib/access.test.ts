@@ -1,7 +1,7 @@
 import { beforeAll, describe, expect, test } from "bun:test";
 import { SignJWT, createLocalJWKSet, exportJWK, generateKeyPair } from "jose";
 
-import { createAccessVerifier, identityFromEnv } from "./access";
+import { createAccessVerifier, identityFromEnv, isPublicRequest } from "./access";
 
 const ISSUER = "https://garten.cloudflareaccess.com";
 const AUDIENCE = "aud-of-this-application";
@@ -194,5 +194,38 @@ describe("identityFromEnv", () => {
     const identify = identityFromEnv({ AUTH_DEV_BYPASS: "true" });
 
     expect(await identify(new Headers())).toBeNull();
+  });
+});
+
+describe("isPublicRequest", () => {
+  test("lets the manifest, its icons and the service worker through", () => {
+    for (const path of [
+      "/manifest.webmanifest",
+      "/sw.js",
+      "/icon-192.png",
+      "/icon-512.png",
+    ]) {
+      expect(isPublicRequest("GET", path)).toBe(true);
+      expect(isPublicRequest("HEAD", path)).toBe(true);
+    }
+  });
+
+  test("keeps everything else behind Access", () => {
+    for (const path of [
+      "/",
+      "/index.html",
+      "/api/water-plants",
+      "/apple-touch-icon.png",
+      "/sw.js/",
+      "/manifest.webmanifest.bak",
+      "/uploads/2026/05/abc.webp",
+    ]) {
+      expect(isPublicRequest("GET", path)).toBe(false);
+    }
+  });
+
+  test("only for reading", () => {
+    expect(isPublicRequest("POST", "/sw.js")).toBe(false);
+    expect(isPublicRequest("PUT", "/manifest.webmanifest")).toBe(false);
   });
 });

@@ -34,6 +34,15 @@ onUnauthorized(() => {
   queryClient.invalidateQueries({ queryKey: sessionQueryKey })
 })
 
+// The worker has no fetch handler, so it never sits between the page and the
+// network -- in dev it leaves Vite alone as well. A failure is logged, not
+// shown: the app works the same without it.
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/sw.js').catch((error: unknown) => {
+    console.error('Service Worker konnte nicht registriert werden:', error)
+  })
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryClientProvider client={queryClient}>

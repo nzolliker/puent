@@ -39,6 +39,26 @@ export function createAccessVerifier({ issuer, audience, getKey }: VerifierOptio
   };
 }
 
+// Files a browser fetches without the Access cookie, and that therefore have to
+// be served to a request that carries no token: the web app manifest and the
+// icons it names are fetched credential-less on both iOS and Android, and the
+// service worker script is re-fetched in the background to check for updates.
+//
+// An exact list rather than a prefix or a pattern, so nothing lands on it by
+// accident. None of these carry data. The same paths need a Bypass policy in
+// Cloudflare Access too (see DEPLOYMENT.md), or the request never gets here.
+export const PUBLIC_PATHS: ReadonlySet<string> = new Set([
+  "/manifest.webmanifest",
+  "/sw.js",
+  "/icon-192.png",
+  "/icon-512.png",
+]);
+
+// Reading only: a POST to one of these paths is still checked.
+export function isPublicRequest(method: string, path: string) {
+  return (method === "GET" || method === "HEAD") && PUBLIC_PATHS.has(path);
+}
+
 const ACCESS_HEADER = "cf-access-jwt-assertion";
 const DEV_HEADER = "x-dev-email";
 

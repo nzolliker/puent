@@ -3,7 +3,7 @@ import { eq } from "drizzle-orm";
 
 import { db } from "../db";
 import { users } from "../db/schema/users";
-import { identityFromEnv } from "./access";
+import { identityFromEnv, isPublicRequest } from "./access";
 
 export type SessionUser = {
   id: number;
@@ -22,7 +22,16 @@ const identify = identityFromEnv(process.env);
 // The wall. Nothing is served to a request Cloudflare Access did not sign off:
 // not the API, not a photo, not the frontend. Port 3000 is only published on
 // loopback, but this is what holds if that ever changes.
+//
+// The one exception is PUBLIC_PATHS: the manifest, its icons and the service
+// worker, which browsers fetch without the Access cookie. They pass with no
+// `email` set, and none of them reaches anything that reads it.
 export const requireAccess = createMiddleware<AppEnv>(async (c, next) => {
+  if (isPublicRequest(c.req.method, c.req.path)) {
+    await next();
+    return;
+  }
+
   const email = await identify(c.req.raw.headers);
 
   if (!email) {
