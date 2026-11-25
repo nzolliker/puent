@@ -7,6 +7,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { Images, Loader2, Pencil, Plus, Upload, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { ZoomableImage } from '@/components/zoomable-image'
 import { MemberOnly, ReadOnlyNotice } from '@/components/access'
 import { BedThumb, BedView, GardenMap } from '@/components/garden-map'
 import { useCanEdit } from '@/lib/auth'
@@ -553,6 +554,7 @@ function PlantingRow({
 }) {
     const canEdit = useCanEdit()
     const ready = pendingReady ?? isReady(planting)
+    const [photoOpen, setPhotoOpen] = useState(false)
 
     const details: ReactNode[] = [
         planting.removedAt
@@ -624,21 +626,37 @@ function PlantingRow({
                     <div className="flex min-w-0 flex-1 items-center gap-2">{summary}</div>
                 )}
                 {planting.photoStorageKey && (
-                    <a
-                        href={photoUrl(planting.photoStorageKey, 'display')}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label={`Foto von ${planting.crop}`}
-                        className="size-9 shrink-0 overflow-hidden rounded-md bg-muted"
-                    >
-                        <img
-                            src={photoUrl(planting.photoStorageKey)}
-                            alt=""
-                            loading="lazy"
-                            decoding="async"
-                            className="h-full w-full object-cover"
-                        />
-                    </a>
+                    <>
+                        <button
+                            type="button"
+                            aria-label={`Foto von ${planting.crop}`}
+                            onClick={() => setPhotoOpen(true)}
+                            className="size-9 shrink-0 overflow-hidden rounded-md bg-muted"
+                        >
+                            <img
+                                src={photoUrl(planting.photoStorageKey)}
+                                alt=""
+                                loading="lazy"
+                                decoding="async"
+                                className="h-full w-full object-cover"
+                            />
+                        </button>
+                        {/* Over the page rather than in a new tab, which on a
+                            phone is one more thing to close again. The large
+                            image loads only once this opens. */}
+                        <Dialog open={photoOpen} onOpenChange={setPhotoOpen}>
+                            <DialogContent className="gap-3 p-3 sm:max-w-lg">
+                                <DialogHeader>
+                                    <DialogTitle>{planting.crop}</DialogTitle>
+                                </DialogHeader>
+                                <ZoomableImage
+                                    src={photoUrl(planting.photoStorageKey, 'display')}
+                                    alt={planting.crop}
+                                    className="max-h-[70dvh] w-full rounded-md object-contain"
+                                />
+                            </DialogContent>
+                        </Dialog>
+                    </>
                 )}
                 {!ownLine && <MemberOnly>{editButton}</MemberOnly>}
             </div>

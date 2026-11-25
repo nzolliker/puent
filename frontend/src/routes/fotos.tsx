@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { ImagePlus, Loader2, Plus, Trash2, Upload, X } from 'lucide-react'
 
 import { Button } from '@/components/ui/button'
+import { ZoomableImage } from '@/components/zoomable-image'
 import { MemberOnly, ReadOnlyNotice } from '@/components/access'
 import { useCanEdit } from '@/lib/auth'
 import { Input } from '@/components/ui/input'
@@ -464,7 +465,7 @@ function Fotos() {
                     </DialogHeader>
                     {activePhoto && (
                         <>
-                            <img
+                            <ZoomableImage
                                 src={photoUrl(activePhoto.storageKey, 'display')}
                                 alt={activePhoto.caption ?? ''}
                                 width={activePhoto.width}
